@@ -18,10 +18,38 @@ Deno.serve(async(req)=>{try{
  const member=members.find((m:any)=>key(m.email)===email&&m.active);
  if(!admin&&!member)fail('A hozzáférésed még nincs engedélyezve. Kérd az adminisztrátortól.',403);
  const manager=admin||member?.access==='manager',employee=member?.employee||user.full_name||user.email;
- const body=await req.json(),action=body.action;
+ const body:any=req.headers.get('content-type')?.includes('multipart/form-data')?Object.fromEntries(await req.formData()):await req.json(),action=body.action;
  const requireAdmin=()=>{if(!admin)fail('Ehhez adminisztrátori jogosultság kell.',403)};
  const resolveEmployee=()=>{if(!admin)return employee;let n=clean(body.employee||employee);if(n.length<2||n.length>150)fail('Válassz kollégát.');return n};
  const ruleList=()=>all(E.HQRule);
+ const documentCategories=['Ajánlat','Megrendelés','Műszaki dokumentum','Minőségi bizonylat','Forgalmi export','Napi jelentés','Egyéb'];
+ const canReadDocument=(d:any)=>!!d&&(manager||key(d.owner_email)===email||d.visibility==='team');
+ const publicDocument=(d:any)=>{const {file_uri,...meta}=d;return meta};
+ if(action==='listDocuments'){
+  const docs=await all(E.HQDocument);return Response.json({documents:docs.filter(canReadDocument).sort((a:any,b:any)=>b.created_date.localeCompare(a.created_date)).map(publicDocument)});
+ }
+ if(action==='uploadDocument'){
+  const file=body.file;if(!(file instanceof File)||!file.size||file.size>25*1024*1024)fail('Legfeljebb 25 MB-os, nem üres fájl tölthető fel.');
+  const filename=clean(file.name).replace(/[\\/\u0000-\u001f]/g,'_').slice(0,250);
+  if(!/\.(pdf|docx?|xlsx?|csv|png|jpe?g|txt|json|html)$/i.test(filename))fail('Nem támogatott fájltípus.');
+  const clientKey=clean(body.client_key);if(!/^[A-Za-z0-9-]{8,80}$/.test(clientKey))fail('Hiányzó feltöltésazonosító.');
+  if(!validDate(body.document_date)||!documentCategories.includes(body.category)||!['team','private'].includes(body.visibility))fail('Ellenőrizd a dátumot, típust és hozzáférést.');
+  const note=clean(body.note);if(note.length>5000)fail('A megjegyzés legfeljebb 5000 karakter lehet.');
+  const previous=(await all(E.HQDocument,{client_key:clientKey,owner_email:email}))[0];if(previous)return Response.json({document:publicDocument(previous)});
+  const company=body.company_id?await E.HQCompany.get(clean(body.company_id)):null;if(body.company_id&&!company?.active)fail('A kiválasztott cég nem aktív.');
+  const uploaded=await b.asServiceRole.integrations.Core.UploadPrivateFile({file});if(!uploaded?.file_uri)fail('A fájl feltöltése nem sikerült.',502);
+  const doc=await E.HQDocument.create({filename,file_uri:uploaded.file_uri,size_bytes:file.size,mime_type:file.type||'application/octet-stream',company_id:company?.id||'',company:company?.name||'',category:body.category,document_date:body.document_date,visibility:body.visibility,note,owner_email:email,employee,archived:false,client_key:clientKey});
+  return Response.json({document:publicDocument(doc)});
+ }
+ if(action==='documentLink'||action==='archiveDocument'){
+  const doc=await E.HQDocument.get(clean(body.id));if(!canReadDocument(doc))fail('A dokumentum nem érhető el.',403);
+  if(action==='documentLink'){const link=await b.asServiceRole.integrations.Core.CreateFileSignedUrl({file_uri:doc.file_uri,expires_in:600});return Response.json({signed_url:link.signed_url,filename:doc.filename})}
+  if(!admin&&key(doc.owner_email)!==email)fail('Csak saját dokumentumot archiválhatsz.',403);
+  if(typeof body.archived!=='boolean')fail('Hibás állapot.');
+  if(body.expected_updated!==doc.updated_date)fail('A dokumentum időközben változott. Frissítsd a listát.',409);
+  const updated=await E.HQDocument.update(doc.id,{archived:body.archived});return Response.json({document:publicDocument(updated)});
+ }
+
  if(action==='bootstrap'){
   const [companies,rules,manifests]=await Promise.all([all(E.HQCompany),ruleList(),E.HQReport.filter({committed:true},'-created_date',1)]);
   return Response.json({user:{id:user.id,email:user.email,name:user.full_name},admin,manager,employee,members:admin?members:[],companies:companies.filter((c:any)=>c.active),rules,manifest:manifests[0]||null,actions,buckets,today:today()});
@@ -81,7 +109,7 @@ Deno.serve(async(req)=>{try{
   const s=validateState(await unzip(chunks.map((c:any)=>c.payload).join('')));const record=await E.HQReport.create({revision:body.revision,chunk_count:chunks.length,committed:true,source:'Adatközpont',rows:s.parts.reduce((n:number,p:any)=>n+p.rows.length,0)});return Response.json({manifest:record});
  }
  if(action==='report'){
-  const manifest=(await E.HQReport.filter({committed:true},'-created_date',1))[0];if(!manifest)fail('Nincs betöltött kimutatás.');
+  const manifest=(await E.HQReport.filter({committed:true},'-created_date',1))[0];if(!manifest)return Response.json({payload:await zip({version:2,activitySchema:1,journalSchema:1,parts:[],settings:{money:'unknown',currency:'HUF',evalYear:new Date().getFullYear(),threshold:15,concentration:35,targets:{},aliases:{},monthlyKpis:[],dormantMonths:2},issues:[]}),manifest:null,admin,employee,manager});
   const chunks=(await all(E.HQChunk,{revision:manifest.revision})).sort((a:any,b:any)=>a.chunk_index-b.chunk_index);if(chunks.length!==manifest.chunk_count)fail('Hiányos mentés.');let s=validateState(await unzip(chunks.map((c:any)=>c.payload).join('')));
   if(!manager){for(let p of s.parts)p.rows=p.rows.filter((r:any)=>r.employee===employee);s.settings.monthlyKpis=(s.settings.monthlyKpis||[]).filter((r:any)=>r.employee===employee);s.settings.salesActions={};}
   const live=await all(E.HQActivity,manager?{archived:false}:{employee,archived:false});for(let r of live){let p=r.date.slice(0,7),part=s.parts.find((x:any)=>x.key==='daily:'+p);if(!part){part={key:'daily:'+p,kind:'daily',period:p,hash:'hq-live',source:'Base44 napi munkalap',rows:[],issues:[]};s.parts.push(part)}part.rows.push({p,date:r.date,employee:r.employee,company:r.company,action:r.action,bucket:r.bucket,orderT:r.order_t??null,quoteT:r.quote_t??null,bendT:r.bend_t??null,points:r.points??null,note:r.note||'',ref:'Base44!'+r.id,__hqLiveId:r.id})}
