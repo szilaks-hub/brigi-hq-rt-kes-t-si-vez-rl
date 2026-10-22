@@ -1,0 +1,76 @@
+{
+  "name": "HQDocument",
+  "type": "object",
+  "properties": {
+    "filename": {
+      "type": "string"
+    },
+    "file_uri": {
+      "type": "string"
+    },
+    "mime_type": {
+      "type": "string"
+    },
+    "company_id": {
+      "type": "string"
+    },
+    "company": {
+      "type": "string"
+    },
+    "category": {
+      "type": "string"
+    },
+    "document_date": {
+      "type": "string"
+    },
+    "visibility": {
+      "type": "string"
+    },
+    "note": {
+      "type": "string"
+    },
+    "owner_email": {
+      "type": "string"
+    },
+    "employee": {
+      "type": "string"
+    },
+    "client_key": {
+      "type": "string"
+    },
+    "size_bytes": {
+      "type": "number"
+    },
+    "archived": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "filename",
+    "file_uri",
+    "owner_email",
+    "client_key"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
