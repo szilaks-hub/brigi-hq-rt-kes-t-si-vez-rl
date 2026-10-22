@@ -1,0 +1,30 @@
+const fs=require('fs'),vm=require('vm'),ts=require('typescript'),assert=require('assert/strict'),zlib=require('zlib');
+(async()=>{
+const {Window}=await import('/tmp/brigi-hq-check/node_modules/happy-dom/lib/index.js');
+const w=new Window({url:'https://fixture.test',settings:{disableIframePageLoading:true,enableJavaScriptEvaluation:false}});
+global.window=w;global.document=w.document;global.navigator=w.navigator;global.HTMLElement=w.HTMLElement;global.Event=w.Event;global.IS_REACT_ACT_ENVIRONMENT=true;global.location=w.location;
+const React=require('react'),{createRoot}=require('react-dom/client'),{act}=require('react-dom/test-utils');
+const state={version:2,parts:[],settings:{}},boot={user:{email:'admin@example.test'},admin:true,manager:true,employee:'Admin',today:'2026-10-22',members:[],companies:[{id:'c1',name:'Pontos Cég Kft.',countries:['HU'],owners:['Éva'],teams:['Brigi'],types:['vevő']}],actions:['Ajánlat','Megrendelés'],buckets:['4-8 t'],rules:[]};
+let calls=[],documents=[],messages=[];const api=async(name,data)=>{calls.push(data);switch(data.action){case 'bootstrap':return {data:boot};case 'report':return {data:{payload:zlib.gzipSync(JSON.stringify(state)).toString('base64'),manifest:{revision:'r1'}}};case 'getDay':return {data:{sheet:null,rows:[]}};case 'listDocuments':return {data:{documents}};case 'uploadDocument':{const d={id:'doc1',filename:data.file.name,size_bytes:data.file.size,employee:'Admin',owner_email:boot.user.email,company:boot.companies[0].name,company_id:'c1',category:data.category,visibility:data.visibility,document_date:data.document_date,note:data.note,archived:false,updated_date:'1'};documents.push(d);return {data:{document:d}}}default:throw Error('Unexpected fixture API '+data.action)}};
+global.fetch=async()=>({ok:true,text:async()=>'<html><body>Report test frame</body></html>'});
+const cache={};function load(file){if(cache[file])return cache[file].exports;let module={exports:{}};cache[file]=module;const code=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{jsx:ts.JsxEmit.React,target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,esModuleInterop:true}}).outputText;const req=n=>n.endsWith('.css')?{}:n==='@/api/base44Client'?{base44:{functions:{invoke:api}}}:n==='@/lib/AuthContext'?{useAuth:()=>({user:{email:boot.user.email},logout(){},navigateToLogin(){}})}:n==='@/lib/hq-xlsx'?{readCsv(){},readXlsx(){}}:n==='./Documents'?load('src/pages/Documents.jsx'):require(n);vm.runInThisContext('(function(require,module,exports){'+code+'\n})',{filename:file})(req,module,module.exports);return module.exports}
+const container=document.createElement('div');document.body.appendChild(container);const root=createRoot(container),App=load('src/pages/HQApp.jsx').default;
+const pause=()=>new Promise(r=>setTimeout(r,25));async function settle(fn=()=>{}){await act(async()=>{await fn();await pause()})}
+await settle(()=>root.render(React.createElement(App)));await settle();
+const buttons=()=>[...document.querySelectorAll('button')];const navButton=t=>buttons().find(b=>b.closest('.hq-sidebar')&&b.textContent===t);const button=t=>buttons().find(b=>b.textContent===t&&!b.closest('[hidden]'));
+assert.equal(document.querySelectorAll('.hq-sidebar nav button').length,18);assert.equal(document.querySelector('button[aria-current=page]').textContent,'Áttekintés');
+const iframe=document.querySelector('iframe.hq-reportframe');assert(iframe);iframe.contentWindow.postMessage=(d)=>messages.push(d);
+function msg(data){window.dispatchEvent(new w.MessageEvent('message',{source:iframe.contentWindow,origin:location.origin,data}))}
+await settle(()=>msg({type:'hq-ready'}));assert(messages.some(m=>m.type==='hq-init'));
+await settle(()=>msg({type:'hq-navigation',snapshot:{view:'overview',f:{end:'2026-09'},scroll:10}}));
+await settle(()=>navButton('Havi összehasonlítás').click());assert.equal(document.querySelector('button[aria-current=page]').textContent,'Havi összehasonlítás');assert(messages.some(m=>m.type==='hq-route'&&m.view==='trends'));
+await settle(()=>msg({type:'hq-navigation',snapshot:{view:'trends',f:{end:'2026-09'},scroll:0}}));
+await settle(()=>navButton('Napi jelentés').click());assert(!document.querySelector('.hq-native').hidden);assert.equal(document.querySelector('iframe.hq-reportframe'),iframe);
+await settle(()=>button('← Vissza').click());assert.equal(document.querySelector('button[aria-current=page]').textContent,'Havi összehasonlítás');assert(messages.some(m=>m.type==='hq-route'&&m.snapshot?.f.end==='2026-09'));
+await settle(()=>navButton('Cégtörzs').click());await settle(()=>button('Pontos Cég Kft. ↗').click());assert.equal(document.querySelector('button[aria-current=page]').textContent,'Dokumentumtár');assert.equal(document.querySelector('input[list=document-companies]').value,'Pontos Cég Kft.');
+const file=document.querySelector('.hq-doc-upload input[type=file]');Object.defineProperty(file,'files',{value:[new w.File(['content'],'offer.pdf',{type:'application/pdf'})],configurable:true});await settle(()=>file.dispatchEvent(new w.Event('change',{bubbles:true})));assert(button('Dokumentumok mentése').disabled===false);
+await settle(()=>button('Dokumentumok mentése').click());await settle();assert.equal(calls.filter(x=>x.action==='uploadDocument').length,1);assert.equal(documents.length,1);assert(document.querySelector('.hq-document-card').textContent.includes('offer.pdf'));
+await settle(()=>navButton('Áttekintés').click());assert.equal(document.querySelector('iframe.hq-reportframe'),iframe);
+await settle(()=>root.unmount());await w.happyDOM.close();
+console.log('PASS: 18 direct menus, retained report frame, route bridge, back with filters, company document link, file queue and upload UI. Isolated fixture, no production mutations.');
+})().catch(e=>{console.error(e);process.exitCode=1});
