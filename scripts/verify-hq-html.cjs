@@ -3,7 +3,7 @@ const fs=require('fs'),assert=require('assert/strict');
 (async()=>{
 const {Window}=await import('/tmp/brigi-hq-check/node_modules/happy-dom/lib/index.js');
 const w=new Window({url:'https://fixture.test',settings:{enableJavaScriptEvaluation:true,disableCSSFileLoading:true,disableJavaScriptFileLoading:true,disableIframePageLoading:true}});
-const messages=[],parent={postMessage:m=>{messages.push(m);if(m.type==='hq-save')setTimeout(()=>send({type:'hq-saved',id:m.id,ok:true}),0)}};
+const messages=[],parent={location:{origin:w.location.origin},postMessage:m=>{messages.push(m);if(m.type==='hq-save')setTimeout(()=>send({type:'hq-saved',id:m.id,ok:true}),0)}};
 Object.defineProperty(w,'parent',{value:parent});
 w.scrollTo=()=>{};w.print=()=>{};w.structuredClone=structuredClone;
 const html=fs.readFileSync('public/hq-legacy.html','utf8');
