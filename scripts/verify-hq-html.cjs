@@ -16,7 +16,7 @@ const parts=['2026-08','2026-09'].map((p,i)=>({key:'sales:'+p,kind:'sales',perio
 parts.push({key:'daily:2026-09',kind:'daily',period:'2026-09',source:'fixture',hash:'daily',issues:[],rows:[{p:'2026-09',date:'2026-09-12',company:'Teszt Kft.',employee:'Éva',action:'Ajánlat',bucket:'4-8 t',orderT:null,quoteT:6,bendT:null,points:2,note:'Egyeztetés',ref:'fixture'}]});
 const state={version:2,activitySchema:1,journalSchema:1,parts,settings:{money:'unknown',currency:'HUF',evalYear:2026,threshold:15,concentration:35,targets:{},aliases:{},monthlyKpis:[],dormantMonths:2},issues:[]};
 send({type:'hq-init',state,admin:true});
-assert(w.document.querySelector('#screen').textContent.length>100);assert(messages.some(x=>x.type==='hq-initialized'));
+assert(w.document.querySelector('#screen').textContent.length>100,w.document.querySelector('#screen').textContent);assert(messages.some(x=>x.type==='hq-initialized'));
 for(const view of ['overview','attention','review','trends','team','companies','matching','countries','products','activity','ricsi','summary','data']){
 send({type:'hq-route',view});assert(w.document.querySelector('#pageTitle').textContent.length>0,view);assert(messages.some(x=>x.type==='hq-navigation'&&x.snapshot.view===view),view);
 }
