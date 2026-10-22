@@ -9,7 +9,7 @@ w.scrollTo=()=>{};w.print=()=>{};w.structuredClone=structuredClone;
 const html=fs.readFileSync('public/hq-legacy.html','utf8');
 const scripts=[...html.matchAll(/<script([^>]*)>([\s\S]*?)<\/script>/g)].filter(x=>!x[1].includes('application/octet-stream')).map(x=>x[2]);
 w.document.write(html.replace(/<script[^>]*>[\s\S]*?<\/script>/g,''));
-for(const s of scripts)w.eval(s);
+w.eval(scripts.join('\n;\n')+'\nwindow.__testPersist=next=>persistWorkspace(next);');
 function send(data){w.dispatchEvent(new w.MessageEvent('message',{data,origin:w.location.origin,source:parent}))}
 const row=(p,kg)=>({p,kg,value:kg*300,employee:'Éva',owner:'Éva',company:'Teszt Kft.',country:'Magyarország',currency:'HUF',shipping:'Normál',product:'Betonacél 12 mm',category:'Betonacél',team:'Brigi',date:p+'-12',ref:'fixture'});
 const parts=['2026-08','2026-09'].map((p,i)=>({key:'sales:'+p,kind:'sales',period:p,source:'fixture',hash:p,issues:[],rows:[row(p,(i+1)*10000)]}));
@@ -21,7 +21,7 @@ for(const view of ['overview','attention','review','trends','team','companies','
 send({type:'hq-route',view});assert(w.document.querySelector('#pageTitle').textContent.length>0,view);assert(messages.some(x=>x.type==='hq-navigation'&&x.snapshot.view===view),view);
 }
 assert(w.document.querySelector('#screen').textContent.includes('közös'));
-await w.eval("persistWorkspace({...state,settings:{...state.settings,monthlyKpis:[{p:'2026-09',employee:'Éva',metric:'customMesh',value:7,source:'Teszt'}]}})");
+await w.__testPersist({...state,settings:{...state.settings,monthlyKpis:[{p:'2026-09',employee:'Éva',metric:'customMesh',value:7,source:'Teszt'}]}});
 assert(messages.some(x=>x.type==='hq-save'&&x.state.settings.monthlyKpis[0]?.value===7));
 send({type:'hq-route',view:'summary'});assert(w.document.querySelectorAll('#screen table tfoot').length>0);
 send({type:'hq-route',view:'trends'});assert(w.document.querySelectorAll('#screen svg').length>0);
