@@ -64,6 +64,12 @@ Deno.serve(async(req)=>{try{
   requireAdmin();if(!Array.isArray(body.companies)||body.companies.length>100)fail('Legfeljebb 100 cég tölthető fel egy részletben.');let existing=await all(E.HQCompany),map=new Map(existing.map((c:any)=>[key(c.name),c])),added=0,updated=0;
   for(let c of body.companies){const name=clean(c.name);if(!name||name.length>500)fail('Hibás cégnév.');let data:any={name,source:clean(body.source),active:true};let old:any=map.get(key(name));for(let k of ['countries','owners','teams','types'])data[k]=Array.isArray(c[k])&&c[k].length?[...new Set(c[k].map(clean).filter(Boolean))]:(old?.[k]||[]);if(old){await E.HQCompany.update(old.id,data);updated++}else{const fresh=await E.HQCompany.create(data);map.set(key(name),fresh);added++}}return Response.json({added,updated});
  }
+ if(action==='stageChunks'){
+  requireAdmin();if(!/^[A-Za-z0-9-]{4,80}$/.test(body.revision)||!Array.isArray(body.chunks)||!body.chunks.length||body.chunks.length>20)fail('Hibás mentési csomag.');
+  const existing=await all(E.HQChunk,{revision:body.revision}),map=new Map(existing.map((c:any)=>[c.chunk_index,c.payload])),pending:any[]=[];
+  for(let c of body.chunks){if(!Number.isInteger(c.chunk_index)||c.chunk_index<0||c.chunk_index>1000||typeof c.payload!=='string'||c.payload.length>8000)fail('Hibás adatrész.');if(map.has(c.chunk_index)){if(map.get(c.chunk_index)!==c.payload)fail('Ütköző adatrész.');}else{pending.push({revision:body.revision,chunk_index:c.chunk_index,payload:c.payload});map.set(c.chunk_index,c.payload)}}
+  if(pending.length)await E.HQChunk.bulkCreate(pending);return Response.json({ok:true});
+ }
  if(action==='stageChunk'){
   requireAdmin();if(!/^[A-Za-z0-9-]{4,80}$/.test(body.revision)||!Number.isInteger(body.chunk_index)||body.chunk_index<0||body.chunk_index>1000||typeof body.payload!=='string'||body.payload.length>8000)fail('Hibás mentési csomag.');
   const old=(await all(E.HQChunk,{revision:body.revision,chunk_index:body.chunk_index}))[0];if(old){if(old.payload!==body.payload)fail('Ütköző mentési csomag.');return Response.json({ok:true})}
