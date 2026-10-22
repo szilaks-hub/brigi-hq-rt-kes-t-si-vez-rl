@@ -1,0 +1,48 @@
+{
+  "name": "HQMember",
+  "type": "object",
+  "properties": {
+    "email": {
+      "type": "string"
+    },
+    "employee": {
+      "type": "string"
+    },
+    "access": {
+      "type": "string",
+      "enum": [
+        "employee",
+        "manager"
+      ]
+    },
+    "team": {
+      "type": "string"
+    },
+    "active": {
+      "type": "boolean"
+    }
+  },
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  },
+  "required": []
+}

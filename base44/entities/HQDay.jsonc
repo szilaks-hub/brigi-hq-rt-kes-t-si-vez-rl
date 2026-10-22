@@ -1,0 +1,48 @@
+{
+  "name": "HQDay",
+  "type": "object",
+  "properties": {
+    "key": {
+      "type": "string"
+    },
+    "date": {
+      "type": "string"
+    },
+    "employee": {
+      "type": "string"
+    },
+    "owner_email": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "open",
+        "closed"
+      ]
+    }
+  },
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  },
+  "required": []
+}

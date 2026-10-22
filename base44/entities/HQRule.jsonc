@@ -1,0 +1,44 @@
+{
+  "name": "HQRule",
+  "type": "object",
+  "properties": {
+    "action": {
+      "type": "string"
+    },
+    "bucket": {
+      "type": "string"
+    },
+    "points": {
+      "type": "number"
+    },
+    "effective_from": {
+      "type": "string"
+    },
+    "enabled": {
+      "type": "boolean"
+    }
+  },
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  },
+  "required": []
+}

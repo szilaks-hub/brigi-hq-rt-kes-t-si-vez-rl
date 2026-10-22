@@ -1,0 +1,44 @@
+{
+  "name": "HQReport",
+  "type": "object",
+  "properties": {
+    "revision": {
+      "type": "string"
+    },
+    "chunk_count": {
+      "type": "number"
+    },
+    "committed": {
+      "type": "boolean"
+    },
+    "source": {
+      "type": "string"
+    },
+    "rows": {
+      "type": "number"
+    }
+  },
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  },
+  "required": []
+}

@@ -1,0 +1,89 @@
+{
+  "name": "HQActivity",
+  "type": "object",
+  "properties": {
+    "date": {
+      "type": "string"
+    },
+    "employee": {
+      "type": "string"
+    },
+    "owner_email": {
+      "type": "string"
+    },
+    "company_id": {
+      "type": "string"
+    },
+    "company": {
+      "type": "string"
+    },
+    "action": {
+      "type": "string"
+    },
+    "bucket": {
+      "type": "string"
+    },
+    "order_t": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "quote_t": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "bend_t": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "points": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "rule_id": {
+      "type": "string"
+    },
+    "rule_label": {
+      "type": "string"
+    },
+    "note": {
+      "type": "string"
+    },
+    "client_key": {
+      "type": "string"
+    },
+    "archived": {
+      "type": "boolean"
+    }
+  },
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  },
+  "required": []
+}
