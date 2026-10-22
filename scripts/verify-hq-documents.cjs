@@ -1,0 +1,58 @@
+const fs=require('fs'),vm=require('vm'),ts=require('typescript'),assert=require('node:assert/strict'),zlib=require('zlib');
+const tables={},entities={};let seq=0,handler,user;
+const clone=x=>structuredClone(x), names=['HQMember','HQCompany','HQRule','HQDay','HQActivity','HQChunk','HQReport','HQDocument'];
+for(const name of names){tables[name]=[];entities[name]={filter:async(q={},sort='id',limit=500,skip=0)=>{let r=tables[name].filter(x=>Object.entries(q).every(([k,v])=>x[k]===v));let sign=sort[0]==='-'?-1:1,key=sort.replace(/^-/,'');r.sort((a,b)=>String(a[key]).localeCompare(String(b[key]))*sign);return clone(r.slice(skip,skip+limit))},get:async id=>clone(tables[name].find(x=>x.id===id)),create:async data=>{let r={...clone(data),id:String(++seq).padStart(6,'0'),created_date:new Date(1700000000000+seq).toISOString(),updated_date:new Date(1700000000000+seq).toISOString()};tables[name].push(r);return clone(r)},update:async(id,data)=>{let i=tables[name].findIndex(x=>x.id===id);assert(i>=0);tables[name][i]={...tables[name][i],...clone(data),updated_date:new Date(1700000000000+(++seq)).toISOString()};return clone(tables[name][i])},bulkCreate:async rows=>Promise.all(rows.map(r=>entities[name].create(r)))}}
+const source=fs.readFileSync('base44/functions/hq-api/entry.ts','utf8').replace(/^import .*\n/,'');
+const compiled=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS},reportDiagnostics:true});
+assert(!compiled.diagnostics.some(d=>d.category===ts.DiagnosticCategory.Error));
+vm.runInNewContext(compiled.outputText,{Deno:{serve:fn=>handler=fn},createClientFromRequest:()=>({auth:{me:async()=>user},asServiceRole:{entities,integrations:{Core:{UploadPrivateFile:async({file})=>({file_uri:'private/test/'+file.name}),CreateFileSignedUrl:async({file_uri})=>({signed_url:'https://example.test/signed/'+encodeURIComponent(file_uri)})}}}}),Response,Request,Blob,File:require('node:buffer').File,CompressionStream,DecompressionStream,atob,btoa,Uint8Array,Date,Intl,Set,Map,Number,String,Error,JSON,console});
+const admin={email:'admin@example.test',role:'admin',full_name:'Admin'},eva={email:'eva@example.test',role:'user',full_name:'Account name'};
+async function request(action,data={},status=200){const r=await handler(new Request('https://example.test',{method:'POST',body:JSON.stringify({action,...data})}));const out=await r.json();assert.equal(r.status,status,JSON.stringify(out));return out}
+(async()=>{
+user=null;await request('bootstrap',{},401);
+user={email:'unknown@example.test',role:'user'};await request('bootstrap',{},403);
+user=admin;await request('saveMember',{member:{email:eva.email,employee:'Éva',access:'employee',active:true}});
+await request('companyBatch',{companies:[{name:'Pontos Cég Kft.',owners:['Éva'],countries:['HU'],types:['vevő']}]});
+await request('companyBatch',{companies:[{name:'Pontos Cég Kft.'}]});assert.equal(tables.HQCompany.length,1);assert.deepEqual(tables.HQCompany[0].owners,['Éva']);
+await request('saveRule',{rule:{action:'Ajánlat',bucket:'',points:2,effective_from:'2026-01-01'}});
+await request('saveRule',{rule:{action:'Ajánlat',bucket:'4-8 t',points:5,effective_from:'2026-01-01'}});
+await request('saveRule',{rule:{action:'Ajánlat',bucket:'4-8 t',points:99,effective_from:'2099-01-01'}});
+user=eva;let boot=await request('bootstrap');assert.equal(boot.employee,'Éva');assert.equal(boot.admin,false);assert.equal(boot.members.length,0);
+await request('saveRule',{rule:{}},403);await request('companyBatch',{companies:[]},403);await request('openDay',{date:'2099-01-01'},400);
+let day=await request('openDay',{date:'2026-10-22',employee:'Más kolléga'});assert.equal(day.sheet.employee,'Éva');
+const input={date:'2026-10-22',employee:'Más kolléga',row:{client_key:'test-row',company_id:tables.HQCompany[0].id,action:'Ajánlat',bucket:'4-8 t',quote_t:6,order_t:'',note:'Teszt'}};
+let saved=await request('saveRow',input);assert.equal(saved.row.employee,'Éva');assert.equal(saved.row.points,5);assert.equal(saved.row.order_t,null);assert.equal(saved.row.company,'Pontos Cég Kft.');
+await request('saveRow',input);assert.equal(tables.HQActivity.length,1);
+await request('saveRow',{...input,row:{...input.row,client_key:'negative',order_t:-1}},400);
+await request('saveRow',{...input,id:saved.row.id,expected_updated:'old'},409);
+await request('setDayStatus',{date:input.date,status:'closed'});
+await request('saveRow',{...input,row:{...input.row,client_key:'closed'}},400);
+await request('setDayStatus',{date:input.date,status:'open'},403);
+user=admin;await request('setDayStatus',{date:input.date,employee:'Éva',status:'open'});
+const state={version:2,parts:[{key:'sales:2026-01',kind:'sales',period:'2026-01',rows:[{p:'2026-01',company:'Pontos Cég Kft.',employee:'Éva',kg:1000},{p:'2026-01',company:'Más Cég',employee:'Béla',kg:9000}]}],settings:{monthlyKpis:[],salesActions:{}}};
+const payload=zlib.gzipSync(JSON.stringify(state)).toString('base64');
+await request('stageChunks',{revision:'test-revision',chunks:[{chunk_index:0,payload}]});
+await request('commitReport',{revision:'test-revision',chunk_count:1,expected_revision:null});
+user=eva;let report=await request('report');let decoded=JSON.parse(zlib.gunzipSync(Buffer.from(report.payload,'base64')));assert.equal(decoded.parts[0].rows.length,1);assert.equal(decoded.parts.find(x=>x.kind==='daily').rows[0].points,5);
+await request('commitReport',{},403);
+user=admin;let other=await entities.HQActivity.create({...saved.row,id:undefined,employee:'Béla'});
+user=eva;await request('archiveRow',{date:input.date,id:other.id,expected_updated:other.updated_date},403);
+await request('archiveRow',{date:input.date,id:saved.row.id,expected_updated:saved.row.updated_date});
+report=await request('report');decoded=JSON.parse(zlib.gunzipSync(Buffer.from(report.payload,'base64')));assert(!decoded.parts.some(x=>x.kind==='daily'));
+
+// Document operations use isolated records and a mocked private file service.
+user=eva;
+const {File}=require('node:buffer');
+const form=new FormData();form.set('action','uploadDocument');form.set('file',new File(['private document'],'offer.pdf',{type:'application/pdf'}));
+for(const [k,v]of Object.entries({client_key:'document-test-1',category:'Ajánlat',document_date:'2026-10-22',visibility:'private',company_id:tables.HQCompany[0].id,note:'Ajánlati dokumentum'}))form.set(k,v);
+const upload=async()=>{const r=await handler(new Request('https://example.test',{method:'POST',body:form}));const d=await r.json();assert.equal(r.status,200,JSON.stringify(d));return d.document};
+const doc=await upload();await upload();assert.equal(tables.HQDocument.length,1);assert.equal(doc.company,'Pontos Cég Kft.');assert(!('file_uri' in doc));
+let docs=await request('listDocuments');assert.equal(docs.documents.length,1);assert(!('file_uri' in docs.documents[0]));let url=await request('documentLink',{id:doc.id});assert(url.signed_url.startsWith('https://example.test/signed/'));
+user=admin;await request('saveMember',{member:{email:'bela@example.test',employee:'Béla',access:'employee',active:true}});
+user={email:'bela@example.test',role:'user'};docs=await request('listDocuments');assert.equal(docs.documents.length,0);await request('documentLink',{id:doc.id},403);await request('archiveDocument',{id:doc.id,archived:true,expected_updated:doc.updated_date},403);
+user=admin;await entities.HQDocument.update(doc.id,{visibility:'team'});
+user={email:'bela@example.test',role:'user'};docs=await request('listDocuments');assert.equal(docs.documents.length,1);await request('archiveDocument',{id:doc.id,archived:true,expected_updated:docs.documents[0].updated_date},403);
+user=eva;await request('archiveDocument',{id:doc.id,archived:true,expected_updated:'stale'},409);let archived=await request('archiveDocument',{id:doc.id,archived:true,expected_updated:tables.HQDocument[0].updated_date});assert(archived.document.archived);let restored=await request('archiveDocument',{id:doc.id,archived:false,expected_updated:archived.document.updated_date});assert(!restored.document.archived);
+console.log('PASS: document private upload, idempotent retry, list sanitization, company binding, owner/peer access, temporary link, stale change protection, archive and restore.');
+console.log('PASS: authorization, employee isolation, exact company upsert, rule precedence/date, retry deduplication, stale edit, closure, report merge and archive. No live records used.');
+})().catch(e=>{console.error(e);process.exitCode=1});
