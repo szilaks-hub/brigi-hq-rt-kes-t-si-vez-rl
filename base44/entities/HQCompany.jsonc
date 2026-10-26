@@ -43,6 +43,21 @@
     },
     "active": {
       "type": "boolean"
+    },
+    "inactive_reason": {
+      "type": "string"
+    },
+    "inactive_by": {
+      "type": "string"
+    },
+    "inactive_at": {
+      "type": "string"
+    },
+    "reactivated_by": {
+      "type": "string"
+    },
+    "reactivated_at": {
+      "type": "string"
     }
   },
   "required": [],

@@ -183,6 +183,26 @@ Deno.serve(async(req)=>{try{
   let updated=0;for(const id of ids){const c=await E.HQCompany.get(clean(id)).catch(()=>null);if(!c)continue;await E.HQCompany.update(c.id,{county});updated++}
   return Response.json({updated,county});
  }
+ if(action==='setCompanyActive'){
+  const company=await E.HQCompany.get(clean(body.company_id)).catch(()=>null);if(!company)fail('Ismeretlen cég.',404);
+  const canManage=admin||manager;
+  if(!canManage&&!(company.owners||[]).some((o:any)=>personKey(o)===personKey(employee)))fail('Ez a cég nincs hozzád rendelve.',403);
+  const activate=body.active===true;
+  if(!!company.active===activate)fail(activate?'A cég már aktív.':'A cég már inaktív.');
+  let data:any;
+  if(activate)data={active:true,inactive_reason:'',inactive_by:'',inactive_at:'',reactivated_by:employee,reactivated_at:today()};
+  else{
+   const reason=clean(body.reason);if(!['megszűnt','nem releváns','nem kér megkeresést','téves vagy duplikált rekord','egyéb'].includes(reason))fail('Válaszd ki az inaktiválás indokát.');
+   const note=clean(body.note);if(note.length>1000)fail('Az indoklás legfeljebb 1000 karakter lehet.');
+   data={active:false,inactive_reason:reason+(note?' · '+note:''),inactive_by:employee,inactive_at:today(),reactivated_by:'',reactivated_at:''};
+  }
+  return Response.json({company:await E.HQCompany.update(company.id,data)});
+ }
+ if(action==='inactiveCompanies'){
+  if(!admin&&!manager)fail('Ehhez vezetői jogosultság kell.',403);
+  const companies=(await all(E.HQCompany)).filter((c:any)=>!c.active);
+  return Response.json({companies:companies.map((c:any)=>({id:c.id,name:c.name,county:clean(c.county),city:clean(c.city),inactive_reason:clean(c.inactive_reason),inactive_by:clean(c.inactive_by),inactive_at:clean(c.inactive_at)})).sort((a:any,b:any)=>String(b.inactive_at).localeCompare(String(a.inactive_at))||a.name.localeCompare(b.name,'hu')).slice(0,500),total:companies.length});
+ }
  if(action==='countyStats'){
   const person=resolveEmployee(),day0=today(),num=(v:any)=>Number.isFinite(Number(v))?Number(v):0,scopeAll=admin||manager,from='';
   const months:any[]=[];{const d=new Date(Date.UTC(Number(day0.slice(0,4)),Number(day0.slice(5,7))-1,1));d.setUTCMonth(d.getUTCMonth()-11);for(let i=0;i<12;i++){months.push(new Intl.DateTimeFormat('en-CA',{timeZone:'UTC',year:'numeric',month:'2-digit'}).format(d).slice(0,7));d.setUTCMonth(d.getUTCMonth()+1)}}
