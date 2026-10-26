@@ -8,6 +8,9 @@
     "source_key": {
       "type": "string"
     },
+    "county": {
+      "type": "string"
+    },
     "countries": {
       "type": "array",
       "items": {
@@ -39,6 +42,7 @@
       "type": "boolean"
     }
   },
+  "required": [],
   "rls": {
     "read": {
       "user_condition": {
@@ -60,6 +64,5 @@
         "role": "admin"
       }
     }
-  },
-  "required": []
+  }
 }

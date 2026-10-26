@@ -1,6 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk';
 const actions=['Megrendelés','Ajánlat','Új cég','Kivitt hajlítás'];
 const buckets=['0-4 t','4-8 t','8-15 t','15-24 t','24-50 t','50+ t'];
+const huCounties=['Bács-Kiskun','Baranya','Békés','Borsod-Abaúj-Zemplén','Budapest','Csongrád-Csanád','Fejér','Győr-Moson-Sopron','Hajdú-Bihar','Heves','Jász-Nagykun-Szolnok','Komárom-Esztergom','Nógrád','Pest','Somogy','Szabolcs-Szatmár-Bereg','Tolna','Vas','Veszprém','Zala','Külföld'];
 const clean=(s:any)=>String(s??'').trim();
 const key=(s:any)=>clean(s).toLocaleLowerCase('hu').replace(/\s+/g,' ');
 const personKey=(s:any)=>key(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'');
@@ -127,7 +128,7 @@ Deno.serve(async(req)=>{try{
  }
  if(action==='companyBatch'){
   requireAdmin();if(!Array.isArray(body.companies)||body.companies.length>100)fail('Legfeljebb 100 cég tölthető fel egy részletben.');let existing=await all(E.HQCompany),map=new Map(existing.map((c:any)=>[key(c.name),c])),added=0,updated=0;
-  for(let c of body.companies){const name=clean(c.name);if(!name||name.length>500)fail('Hibás cégnév.');let data:any={name,source:clean(body.source),active:true};let old:any=map.get(key(name));for(let k of ['countries','owners','teams','types'])data[k]=Array.isArray(c[k])&&c[k].length?[...new Set(c[k].map(clean).filter(Boolean))]:(old?.[k]||[]);if(old){await E.HQCompany.update(old.id,data);updated++}else{const fresh=await E.HQCompany.create(data);map.set(key(name),fresh);added++}}return Response.json({added,updated});
+  for(let c of body.companies){const name=clean(c.name);if(!name||name.length>500)fail('Hibás cégnév.');let old:any=map.get(key(name));let data:any={name,source:clean(body.source),active:true,county:clean(c.county)||old?.county||''};for(let k of ['countries','owners','teams','types'])data[k]=Array.isArray(c[k])&&c[k].length?[...new Set(c[k].map(clean).filter(Boolean))]:(old?.[k]||[]);if(old){await E.HQCompany.update(old.id,data);updated++}else{const fresh=await E.HQCompany.create(data);map.set(key(name),fresh);added++}}return Response.json({added,updated});
  }
  if(action==='stageChunks'){
   requireAdmin();if(!/^[A-Za-z0-9-]{4,80}$/.test(body.revision)||!Array.isArray(body.chunks)||!body.chunks.length||body.chunks.length>20)fail('Hibás mentési csomag.');
@@ -151,6 +152,50 @@ Deno.serve(async(req)=>{try{
   if(!manager){for(let p of s.parts)p.rows=p.rows.filter((r:any)=>r.employee===employee);s.settings.monthlyKpis=(s.settings.monthlyKpis||[]).filter((r:any)=>r.employee===employee);s.settings.salesActions=Object.fromEntries(Object.entries(s.settings.salesActions||{}).filter(([,a]:any)=>!clean(a?.owner)||personKey(a.owner)===personKey(employee)));}
   const live=await all(E.HQActivity,manager?{archived:false}:{employee,archived:false});for(let r of live){let p=r.date.slice(0,7),part=s.parts.find((x:any)=>x.key==='daily:'+p);if(!part){part={key:'daily:'+p,kind:'daily',period:p,hash:'hq-live',source:'Base44 napi munkalap',rows:[],issues:[]};s.parts.push(part)}part.rows.push({p,date:r.date,employee:r.employee,company:r.company,action:r.action,bucket:r.bucket,orderT:r.order_t??null,quoteT:r.quote_t??null,bendT:r.bend_t??null,points:r.points??null,note:r.note||'',ref:'Base44!'+r.id,__hqLiveId:r.id})}
   s.updatedAt=Date.now();return Response.json({payload:await zip(s),manifest,admin,employee,manager});
+ }
+ if(action==='saveCompanyCounty'){
+  if(!admin&&!manager)fail('Ehhez vezetői jogosultság kell.',403);
+  const ids=Array.isArray(body.company_ids)?body.company_ids:[body.company_id];
+  if(!ids.length||ids.length>500)fail('Egyszerre legfeljebb 500 cég megyéje állítható be.');
+  const county=clean(body.county);if(county&&!huCounties.includes(county))fail('Válassz érvényes megyét.');
+  let updated=0;for(const id of ids){const c=await E.HQCompany.get(clean(id)).catch(()=>null);if(!c)continue;await E.HQCompany.update(c.id,{county});updated++}
+  return Response.json({updated,county});
+ }
+ if(action==='countyStats'){
+  const person=resolveEmployee(),day0=today(),num=(v:any)=>Number.isFinite(Number(v))?Number(v):0,scopeAll=admin||manager,from='';
+  const months:any[]=[];{const d=new Date(Date.UTC(Number(day0.slice(0,4)),Number(day0.slice(5,7))-1,1));d.setUTCMonth(d.getUTCMonth()-11);for(let i=0;i<12;i++){months.push(new Intl.DateTimeFormat('en-CA',{timeZone:'UTC',year:'numeric',month:'2-digit'}).format(d).slice(0,7));d.setUTCMonth(d.getUTCMonth()+1)}}
+  const start=months[0]+'-01';
+  const companies=(await all(E.HQCompany)).filter((c:any)=>c.active&&(scopeAll||(c.owners||[]).some((o:any)=>personKey(o)===personKey(employee))));
+  const rows=(await all(E.HQActivity,{archived:false})).filter((r:any)=>scopeAll||r.employee===employee);
+  const tasks=(await all(E.HQTask,{archived:false})).filter((t:any)=>scopeAll||t.employee===person);
+  const idCounty=new Map<string,string>(),nameCounty=new Map<string,string>();
+  for(const c of companies){idCounty.set(c.id,clean(c.county));nameCounty.set(key(c.name),clean(c.county))}
+  const countyOfRow=(r:any)=>idCounty.has(r.company_id)?idCounty.get(r.company_id):(nameCounty.get(key(r.company))||'');
+  const stat=new Map<string,any>();
+  const bucket=(n:string)=>{const k=clean(n);if(!stat.has(k))stat.set(k,{county:k,companies:0,order_t:0,quote_t:0,bend_t:0,points:0,activities:0,orders:0,offers:0,last:'',openTasks:0,overdue:0,neglected:0,owners:{},trend:months.map((m:string)=>({m,order_t:0,quote_t:0,points:0,activities:0}))});return stat.get(k)};
+  for(const c of companies){const s=bucket(clean(c.county));s.companies++;for(const o of (c.owners||[])){const n=clean(o);if(n)s.owners[n]=(s.owners[n]||0)+1}}
+  const perCompany=new Map<string,any>();
+  for(const r of rows){const k=r.company_id||('n:'+key(r.company));let e=perCompany.get(k);if(!e){e={last:'',order_t:0,quote_t:0,points:0,activities:0,lastOffer:'',lastOrder:''};perCompany.set(k,e)}
+   const d=String(r.date);e.activities++;if(d>e.last)e.last=d;if(d>=start){e.order_t+=num(r.order_t);e.quote_t+=num(r.quote_t);e.points+=num(r.points)}if(r.action==='Ajánlat'&&d>e.lastOffer)e.lastOffer=d;if(num(r.order_t)>0&&d>e.lastOrder)e.lastOrder=d;
+   const s=bucket(countyOfRow(r)),t=s.trend.find((x:any)=>x.m===d.slice(0,7));s.activities++;if(d>s.last)s.last=d;if(d>=start&&t){const tons=num(r.order_t);t.order_t+=tons;t.quote_t+=num(r.quote_t);t.points+=num(r.points);t.activities++;s.order_t+=tons;s.quote_t+=num(r.quote_t);s.bend_t+=num(r.bend_t);s.points+=num(r.points);if(tons>0)s.orders++;if(r.action==='Ajánlat')s.offers++}}
+  const gap=(d:any)=>d?Math.round((Date.parse(day0)-Date.parse(String(d)))/86400000):null;
+  const companyRows=companies.map((c:any)=>{const e=perCompany.get(c.id)||{last:'',order_t:0,quote_t:0,points:0,activities:0,lastOffer:'',lastOrder:''},mine=tasks.filter((x:any)=>x.company_id===c.id&&x.status!=='done'),over=mine.filter((x:any)=>String(x.due_date)<day0).length,s=bucket(clean(c.county)),days=gap(e.last);
+   if(!e.last||days>=60)s.neglected++;s.openTasks+=mine.length;s.overdue+=over;
+   return {id:c.id,name:c.name,county:clean(c.county),owner:(c.owners||[])[0]||'',last:e.last,daysSince:days,order_t:e.order_t,quote_t:e.quote_t,points:e.points,activities:e.activities,openTasks:mine.length,overdue:over,offerOpen:!!e.lastOffer&&(!e.lastOrder||e.lastOffer>e.lastOrder)}});
+  const counties=[...stat.values()].filter((s:any)=>s.county!==''),totals:any={companies:companies.length,order_t:0,points:0,activities:0,neglected:0,orders:0};
+  for(const s of counties){totals.order_t+=s.order_t;totals.points+=s.points;totals.activities+=s.activities;totals.neglected+=s.neglected;totals.orders+=s.orders}
+  const monthly=months.map((m:string,i:number)=>{const o:any={m,order_t:0,quote_t:0,points:0,activities:0};for(const s of counties){const t=s.trend[i];o.order_t+=t.order_t;o.quote_t+=t.quote_t;o.points+=t.points;o.activities+=t.activities}return o});
+  const attention:any[]=[];
+  for(const s of counties){const reasons:string[]=[];let score=0;
+   const last3=s.trend.slice(-3).reduce((n:number,t:any)=>n+t.order_t,0),prev3=s.trend.slice(-6,-3).reduce((n:number,t:any)=>n+t.order_t,0);
+   if(s.neglected){reasons.push(s.neglected+' cég 60+ napja nem kapott kapcsolatot');score+=Math.min(8,s.neglected*2)}
+   if(s.overdue){reasons.push(s.overdue+' lejárt teendő');score+=Math.min(6,s.overdue*2)}
+   if(prev3>0&&last3<prev3*0.8){reasons.push('Az utolsó 3 hónap forgalma '+Math.round((last3/prev3-1)*100)+'% az előző 3 hónaphoz képest');score+=4}
+   if(!s.order_t){reasons.push('Nincs rendelés az elmúlt 12 hónapban ('+s.companies+' cég)');score+=3}
+   else if(s.activities<s.companies*0.5){reasons.push('Kevés aktivitás a cégekhez képest ('+s.activities+' aktivitás / '+s.companies+' cég)');score+=2}
+   if(reasons.length)attention.push({county:s.county,level:score>=8?'magas':score>=4?'közepes':'alacsony',score,reasons,last3,prev3})}
+  attention.sort((a:any,b:any)=>b.score-a.score);
+  return Response.json({today:day0,months,counties,companies:companyRows,totals,monthly,attention,unassigned:companies.filter((c:any)=>!clean(c.county)).length,foreign:(stat.get('Külföld')||{companies:0}).companies});
  }
  if(action==='companyInfo'){
   const person=resolveEmployee(),day0=today(),num=(v:any)=>Number.isFinite(Number(v))?Number(v):0,gap=(d:any)=>d?Math.round((Date.parse(day0)-Date.parse(String(d)))/86400000):null;
