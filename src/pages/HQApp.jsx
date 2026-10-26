@@ -4,9 +4,10 @@ import {useAuth} from '@/lib/AuthContext';
 import {readXlsx,readCsv} from '@/lib/hq-xlsx';
 import './hq.css';
 import Documents from './Documents';
-import {LayoutDashboard,ClipboardList,Target,TrendingUp,Users,Building2,GitCompare,Globe,Package,Activity,FileText,Table2,Database,FolderOpen,SlidersHorizontal,UserCog,Menu} from 'lucide-react';
+import MyResults from '@/components/MyResults';
+import {LayoutDashboard,ClipboardList,Target,TrendingUp,Users,Building2,GitCompare,Globe,Package,Activity,FileText,Table2,Database,FolderOpen,SlidersHorizontal,UserCog,Menu,Award} from 'lucide-react';
 const NAV_GROUPS=[
- {title:'Napi munka',items:[['overview','Áttekintés',LayoutDashboard],['daily','Napi jelentés',ClipboardList],['attention','Értékesítési teendők',Target]]},
+ {title:'Napi munka',items:[['overview','Áttekintés',LayoutDashboard],['daily','Napi jelentés',ClipboardList],['results','Saját eredmény',Award],['attention','Értékesítési teendők',Target]]},
  {title:'Értékesítés és fejlődés',items:[['trends','Havi összehasonlítás',TrendingUp],['summary','DATA / Summary',Table2],['review','Értékelő készítése',Target],['team','Csapat és kollégák',Users],['companies','Vevőmegtartás',Building2],['products','Termékek és beszerzés',Package],['countries','Országok',Globe]]},
  {title:'Kapcsolatok és dokumentumok',items:[['activity','Napló és eredmény',Activity],['ricsi','Ricsi cégleírásai',FileText],['directory','Cégtörzs',Building2],['matching','Cégegyeztetés',GitCompare],['documents','Dokumentumtár',FolderOpen]]},
  {title:'Adatok és beállítások',items:[['data','Adatközpont',Database],['rules','Pontozás',SlidersHorizontal],['access','Hozzáférések',UserCog]]}
@@ -44,7 +45,7 @@ export default function HQApp(){
  {(busy||error||note)&&<div className={'hq-message '+(error?'error':'')} role="status">{error||busy||note}<button aria-label="Üzenet bezárása" onClick={()=>{setError('');setNote('')}}>×</button></div>}
  <section hidden={!isReport} className="hq-report-main"><Reports {...context} request={request} active={isReport} onNavigate={onNavigate} refreshKey={reportRefresh} handleRef={reportHandle}/></section>
  <div hidden={view!=='daily'} className="hq-native"><main className="hq-main"><Daily {...context}/></main></div>
- {!isReport&&view!=='daily'&&<main className="hq-main hq-native">{view==='directory'?<Companies {...context}/>:view==='documents'?<Documents {...context} scope={docScope}/>:view==='rules'?<Rules {...context}/>:view==='access'?<Access {...context}/>:null}</main>}
+ {!isReport&&view!=='daily'&&<main className="hq-main hq-native">{view==='directory'?<Companies {...context}/>:view==='documents'?<Documents {...context} scope={docScope}/>:view==='rules'?<Rules {...context}/>:view==='access'?<Access {...context}/>:view==='results'?<MyResults {...context}/>:null}</main>}
  </div></div>
 }
 

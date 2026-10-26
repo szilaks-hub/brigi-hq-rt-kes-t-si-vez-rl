@@ -118,5 +118,19 @@ Deno.serve(async(req)=>{try{
   const live=await all(E.HQActivity,manager?{archived:false}:{employee,archived:false});for(let r of live){let p=r.date.slice(0,7),part=s.parts.find((x:any)=>x.key==='daily:'+p);if(!part){part={key:'daily:'+p,kind:'daily',period:p,hash:'hq-live',source:'Base44 napi munkalap',rows:[],issues:[]};s.parts.push(part)}part.rows.push({p,date:r.date,employee:r.employee,company:r.company,action:r.action,bucket:r.bucket,orderT:r.order_t??null,quoteT:r.quote_t??null,bendT:r.bend_t??null,points:r.points??null,note:r.note||'',ref:'Base44!'+r.id,__hqLiveId:r.id})}
   s.updatedAt=Date.now();return Response.json({payload:await zip(s),manifest,admin,employee,manager});
  }
+ if(action==='myResults'){
+  const person=resolveEmployee(),from=clean(body.from),to=clean(body.to);
+  if((from&&!validDate(from))||(to&&!validDate(to)))fail('Érvénytelen időszak.');
+  const rows=(await all(E.HQActivity,{employee:person,archived:false})).filter((r:any)=>(!from||r.date>=from)&&(!to||r.date<=to));
+  const num=(v:any)=>Number.isFinite(v)?Number(v):0,actions:any={},companies:any={},months:any={};
+  const bump=(bag:any,k:string,extra:any,p:number,r:any)=>{if(!bag[k])bag[k]={...extra,count:0,points:0,order_t:0,quote_t:0,bend_t:0};const e=bag[k];e.count++;e.points+=p;e.order_t+=num(r.order_t);e.quote_t+=num(r.quote_t);e.bend_t+=num(r.bend_t)};
+  let points=0,order_t=0,quote_t=0,bend_t=0,pending=0;
+  for(const r of rows){const p=r.points==null?0:Number(r.points);if(r.points==null)pending++;points+=p;order_t+=num(r.order_t);quote_t+=num(r.quote_t);bend_t+=num(r.bend_t);
+   bump(actions,clean(r.action)||'Nincs megadva',{action:clean(r.action)||'Nincs megadva'},p,r);
+   bump(companies,clean(r.company)||'Nincs cég',{company:clean(r.company)||'Nincs cég'},p,r);
+   bump(months,String(r.date).slice(0,7),{month:String(r.date).slice(0,7)},p,r)}
+  const ranked=(bag:any)=>Object.values(bag).sort((a:any,b:any)=>b.points-a.points||b.count-a.count);
+  return Response.json({employee:person,rows:rows.length,pending,totals:{points,order_t,quote_t,bend_t},byAction:ranked(actions),byCompany:ranked(companies).slice(0,12),byMonth:Object.values(months).sort((a:any,b:any)=>b.month.localeCompare(a.month))});
+ }
  fail('Ismeretlen művelet.');
 }catch(e){return Response.json({error:e.message||'Hiba történt.'},{status:e.status||500})}});
