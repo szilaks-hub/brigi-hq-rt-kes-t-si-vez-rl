@@ -16,8 +16,15 @@ Deno.serve(async(req)=>{try{
  const b=createClientFromRequest(req),user=await b.auth.me();if(!user)fail('Jelentkezz be.',401);
  const E=b.asServiceRole.entities,admin=user.role==='admin',email=key(user.email);
  const members=admin?await all(E.HQMember):await all(E.HQMember,{email});
- const member=members.find((m:any)=>key(m.email)===email&&m.active);
- if(!admin&&!member)fail('A hozzáférésed még nincs engedélyezve. Kérd az adminisztrátortól.',403);
+ let member=members.find((m:any)=>key(m.email)===email&&m.active);
+ if(!member&&!admin){
+  const tokenKey=(s:any)=>personKey(s).split(' ').filter(Boolean).sort().join(' ');
+  const owners=(await all(E.HQCompany)).flatMap((c:any)=>c.owners||[]).map(clean).filter(Boolean);
+  const named=owners.find((o:any)=>personKey(o)===personKey(user.full_name))||owners.find((o:any)=>tokenKey(o)===tokenKey(user.full_name));
+  member=await E.HQMember.create({email,employee:clean(named||user.full_name||user.email),access:'employee',team:'',active:true});
+  members.push(member);
+ }
+ if(!admin&&!member)fail('A hozzáférésed fel van függesztve. Szólj az adminisztrátornak.',403);
  const manager=admin||member?.access==='manager',employee=member?.employee||user.full_name||user.email;
  const body:any=req.headers.get('content-type')?.includes('multipart/form-data')?Object.fromEntries(await req.formData()):await req.json(),action=body.action;
  const requireAdmin=()=>{if(!admin)fail('Ehhez adminisztrátori jogosultság kell.',403)};
