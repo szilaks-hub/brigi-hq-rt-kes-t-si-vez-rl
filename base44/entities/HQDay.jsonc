@@ -20,8 +20,39 @@
         "open",
         "closed"
       ]
+    },
+    "revision": {
+      "type": "string"
+    },
+    "closed_at": {
+      "type": "string"
+    },
+    "closed_by": {
+      "type": "string"
+    },
+    "closed_by_email": {
+      "type": "string"
+    },
+    "reopen_count": {
+      "type": "number"
+    },
+    "last_reopen_reason": {
+      "type": "string"
+    },
+    "last_reopened_by": {
+      "type": "string"
+    },
+    "rule_versions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "snapshot": {
+      "type": "object"
     }
   },
+  "required": [],
   "rls": {
     "read": {
       "user_condition": {
@@ -43,6 +74,5 @@
         "role": "admin"
       }
     }
-  },
-  "required": []
+  }
 }

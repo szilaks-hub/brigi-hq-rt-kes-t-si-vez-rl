@@ -1,0 +1,77 @@
+{
+  "name": "HQRuleVersion",
+  "type": "object",
+  "properties": {
+    "version": {
+      "type": "number"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "closed"
+      ],
+      "default": "draft"
+    },
+    "effective_from": {
+      "type": "string"
+    },
+    "note": {
+      "type": "string"
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "created_by": {
+      "type": "string"
+    },
+    "created_by_email": {
+      "type": "string"
+    },
+    "closed_by": {
+      "type": "string"
+    },
+    "closed_at": {
+      "type": "string"
+    },
+    "reopened_from": {
+      "type": "string"
+    },
+    "reopen_reason": {
+      "type": "string"
+    },
+    "closed_from": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "status",
+    "effective_from",
+    "items"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

@@ -31,6 +31,9 @@
     "outcome": {
       "type": "string"
     },
+    "result": {
+      "type": "string"
+    },
     "closed_date": {
       "type": "string"
     },
@@ -39,6 +42,50 @@
     },
     "reminder_count": {
       "type": "number"
+    },
+    "task_type": {
+      "type": "string",
+      "enum": [
+        "megkereses",
+        "ajanlat_utani",
+        "dokumentumkeres",
+        "arfrissites",
+        "latogatas",
+        "muszaki_egyeztetes",
+        "rendeles_ellenorzes",
+        "visszaaktivitas",
+        "szallitas",
+        "reklamacio",
+        "egyeb"
+      ],
+      "default": "megkereses"
+    },
+    "priority": {
+      "type": "string",
+      "enum": [
+        "magas",
+        "kozepes",
+        "alacsony"
+      ],
+      "default": "kozepes"
+    },
+    "next_step": {
+      "type": "string"
+    },
+    "origin": {
+      "type": "string"
+    },
+    "suspended": {
+      "type": "boolean"
+    },
+    "suspended_reason": {
+      "type": "string"
+    },
+    "postpone_reason": {
+      "type": "string"
+    },
+    "previous_due": {
+      "type": "string"
     },
     "archived": {
       "type": "boolean"

@@ -1,0 +1,83 @@
+{
+  "name": "HQTrafficAgg",
+  "type": "object",
+  "properties": {
+    "package_revision": {
+      "type": "string"
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "sales",
+        "purchase"
+      ]
+    },
+    "company_key": {
+      "type": "string"
+    },
+    "company": {
+      "type": "string"
+    },
+    "company_id": {
+      "type": "string"
+    },
+    "kg": {
+      "type": "number"
+    },
+    "net": {
+      "type": "number"
+    },
+    "rows": {
+      "type": "number"
+    },
+    "first_date": {
+      "type": "string"
+    },
+    "last_date": {
+      "type": "string"
+    },
+    "months": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "status_mix": {
+      "type": "object"
+    },
+    "currency": {
+      "type": "string"
+    },
+    "active": {
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "required": [
+    "package_revision",
+    "kind",
+    "company_key"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

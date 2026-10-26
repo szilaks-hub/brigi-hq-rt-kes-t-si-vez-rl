@@ -38,6 +38,9 @@
         "type": "string"
       }
     },
+    "currency": {
+      "type": "string"
+    },
     "source": {
       "type": "string"
     },
@@ -51,6 +54,27 @@
       "type": "string"
     },
     "inactive_at": {
+      "type": "string"
+    },
+    "last_inactive_reason": {
+      "type": "string"
+    },
+    "last_inactive_by": {
+      "type": "string"
+    },
+    "last_inactive_at": {
+      "type": "string"
+    },
+    "review_date": {
+      "type": "string"
+    },
+    "snooze_until": {
+      "type": "string"
+    },
+    "muted": {
+      "type": "boolean"
+    },
+    "muted_reason": {
       "type": "string"
     },
     "reactivated_by": {

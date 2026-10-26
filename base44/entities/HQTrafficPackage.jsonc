@@ -1,0 +1,168 @@
+{
+  "name": "HQTrafficPackage",
+  "type": "object",
+  "properties": {
+    "revision": {
+      "type": "string"
+    },
+    "label": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "staged",
+        "active",
+        "superseded",
+        "withdrawn"
+      ],
+      "default": "staged"
+    },
+    "scope": {
+      "type": "string",
+      "enum": [
+        "full",
+        "partial"
+      ],
+      "default": "full"
+    },
+    "period_from": {
+      "type": "string"
+    },
+    "period_to": {
+      "type": "string"
+    },
+    "fingerprint": {
+      "type": "string"
+    },
+    "file_name": {
+      "type": "string"
+    },
+    "file_uri": {
+      "type": "string"
+    },
+    "document_id": {
+      "type": "string"
+    },
+    "file_size": {
+      "type": "number"
+    },
+    "rows_sales": {
+      "type": "number"
+    },
+    "rows_purchase": {
+      "type": "number"
+    },
+    "kg_sales": {
+      "type": "number"
+    },
+    "kg_purchase": {
+      "type": "number"
+    },
+    "net_sales": {
+      "type": "number"
+    },
+    "companies_sales": {
+      "type": "number"
+    },
+    "companies_purchase": {
+      "type": "number"
+    },
+    "zero_weight_rows": {
+      "type": "number"
+    },
+    "negative_weight_rows": {
+      "type": "number"
+    },
+    "processed_rows": {
+      "type": "number"
+    },
+    "undated_rows": {
+      "type": "number"
+    },
+    "new_companies": {
+      "type": "number"
+    },
+    "mismatch_names": {
+      "type": "number"
+    },
+    "changed_companies": {
+      "type": "number"
+    },
+    "removed_companies": {
+      "type": "number"
+    },
+    "delta_kg": {
+      "type": "number"
+    },
+    "currency": {
+      "type": "string"
+    },
+    "currency_confirmed": {
+      "type": "boolean",
+      "default": false
+    },
+    "months": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "movers": {
+      "type": "object"
+    },
+    "uploaded_by": {
+      "type": "string"
+    },
+    "uploaded_by_email": {
+      "type": "string"
+    },
+    "uploaded_at": {
+      "type": "string"
+    },
+    "approved_by": {
+      "type": "string"
+    },
+    "approved_at": {
+      "type": "string"
+    },
+    "superseded_at": {
+      "type": "string"
+    },
+    "issues": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "note": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "revision",
+    "status"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

@@ -53,6 +53,21 @@
     "rule_label": {
       "type": "string"
     },
+    "rule_version": {
+      "type": "number"
+    },
+    "rule_version_id": {
+      "type": "string"
+    },
+    "day_revision": {
+      "type": "string"
+    },
+    "next_step": {
+      "type": "string"
+    },
+    "outcome": {
+      "type": "string"
+    },
     "note": {
       "type": "string"
     },

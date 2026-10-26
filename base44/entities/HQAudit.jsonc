@@ -1,0 +1,66 @@
+{
+  "name": "HQAudit",
+  "type": "object",
+  "properties": {
+    "at": {
+      "type": "string"
+    },
+    "actor_email": {
+      "type": "string"
+    },
+    "actor": {
+      "type": "string"
+    },
+    "action": {
+      "type": "string"
+    },
+    "target_kind": {
+      "type": "string"
+    },
+    "target_id": {
+      "type": "string"
+    },
+    "target_label": {
+      "type": "string"
+    },
+    "before": {
+      "type": "object"
+    },
+    "after": {
+      "type": "object"
+    },
+    "reason": {
+      "type": "string"
+    },
+    "revision": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "action",
+    "actor_email",
+    "target_kind"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
