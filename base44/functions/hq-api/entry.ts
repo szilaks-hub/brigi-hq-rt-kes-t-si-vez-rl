@@ -5,6 +5,7 @@ const clean=(s:any)=>String(s??'').trim();
 const key=(s:any)=>clean(s).toLocaleLowerCase('hu').replace(/\s+/g,' ');
 const personKey=(s:any)=>key(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'');
 const fail=(message:string,status=400)=>{throw Object.assign(new Error(message),{status})};
+const plusDays=(day:string,n:number)=>{const d=new Date(day+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10)};
 const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Budapest',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 function validDate(s:any){return /^20\d{2}-\d{2}-\d{2}$/.test(s)&&!isNaN(Date.parse(s))&&new Date(s).toISOString().slice(0,10)===s}
 async function all(entity:any,query:any={}){let out:any[]=[];for(let skip=0;;skip+=500){let a=await entity.filter(query,'id',500,skip);out.push(...a);if(a.length<500)break}return out}
@@ -71,7 +72,10 @@ Deno.serve(async(req)=>{try{
    if(!sheet)fail('Előbb nyisd meg a munkalapot.');if(body.status==='open'&&!admin)fail('Lezárt munkalapot csak az admin nyithat újra.',403);
    if(!['open','closed'].includes(body.status))fail('Hibás állapot.');sheet=await E.HQDay.update(sheet.id,{status:body.status});
   }
-  const rows=await all(E.HQActivity,{date:day,employee:person,archived:false});return Response.json({sheet,rows});
+  const rows=await all(E.HQActivity,{date:day,employee:person,archived:false});
+  const tasks=(await all(E.HQTask,{employee:person,archived:false})).sort((a:any,b:any)=>String(a.due_date).localeCompare(String(b.due_date))||String(b.created_date).localeCompare(String(a.created_date)));
+  const teamTasks=admin?(await all(E.HQTask)).filter((t:any)=>t.status!=='done'&&!t.archived).sort((a:any,b:any)=>String(a.due_date).localeCompare(String(b.due_date))):[];
+  return Response.json({sheet,rows,tasks,teamTasks});
  }
  if(action==='saveRow'||action==='archiveRow'){
   const person=resolveEmployee(),day=clean(body.date);if(!validDate(day)||day>today())fail('Érvénytelen munkanap.');
@@ -87,6 +91,29 @@ Deno.serve(async(req)=>{try{
   const candidates=(await ruleList()).filter((r:any)=>r.enabled&&r.action===data.action&&(!r.bucket||r.bucket===data.bucket)&&r.effective_from<=day).sort((a:any,b:any)=>(Number(!!b.bucket)-Number(!!a.bucket))||b.effective_from.localeCompare(a.effective_from)||b.created_date.localeCompare(a.created_date));
   const rule=candidates[0];Object.assign(data,{date:day,employee:person,owner_email:previous?.owner_email||email,company:company.name,points:rule?rule.points:null,rule_id:rule?.id||'',rule_label:rule?rule.action+' / '+(rule.bucket||'minden sáv')+' / '+rule.effective_from:'Nincs pontszabály',archived:false});
   const row=previous?await E.HQActivity.update(previous.id,data):await E.HQActivity.create(data);return Response.json({row});
+ }
+ if(action==='saveTask'||action==='closeTask'||action==='postponeTask'){
+  const person=resolveEmployee();
+  if(action==='saveTask'){
+   const t=body.task||{},note=clean(t.note),due=clean(t.due_date)||plusDays(today(),7);
+   if(!note)fail('Írd le, miről volt szó és mi a következő lépés.');if(note.length>2000)fail('A teendő legfeljebb 2000 karakter lehet.');
+   if(!validDate(due))fail('Érvénytelen határidő.');
+   const company=await E.HQCompany.get(clean(t.company_id)).catch(()=>null);if(!company?.active)fail('A cég nem aktív.');
+   if(!admin&&!manager&&!(company.owners||[]).some((o:any)=>personKey(o)===personKey(employee)))fail('Ez a cég nincs hozzád rendelve.',403);
+   const previous=t.id?await E.HQTask.get(clean(t.id)).catch(()=>null):null;if(previous&&previous.employee!==person)fail('Másik kolléga teendője nem módosítható.',403);
+   const data={employee:person,owner_email:previous?.owner_email||email,company_id:company.id,company:company.name,note,due_date:due,archived:false};
+   const task=previous?await E.HQTask.update(previous.id,data):await E.HQTask.create({...data,status:'open',outcome:'',closed_date:'',postpone_count:0,reminder_count:0});
+   return Response.json({task});
+  }
+  const task=await E.HQTask.get(clean(body.id)).catch(()=>null);if(!task)fail('Nincs ilyen teendő.',404);
+  if(task.employee!==person)fail('Ez nem a te teendőd.',403);
+  if(action==='postponeTask'){
+   const due=clean(body.due_date)||plusDays(today(),7);if(!validDate(due)||due<today())fail('Érvénytelen új határidő.');
+   return Response.json({task:await E.HQTask.update(task.id,{due_date:due,status:'open',postpone_count:(task.postpone_count||0)+1})});
+  }
+  if(!['sikeres','sikertelen'].includes(body.outcome))fail('Hibás eredmény.');
+  const updated=body.outcome==='sikeres'?await E.HQTask.update(task.id,{status:'done',outcome:'sikeres',closed_date:today()}):await E.HQTask.update(task.id,{status:'open',outcome:'sikertelen',closed_date:'',due_date:plusDays(today(),7),reminder_count:(task.reminder_count||0)+1});
+  return Response.json({task:updated});
  }
  if(action==='saveRule'){
   requireAdmin();let r=body.rule;if(!actions.includes(r.action)||r.bucket&&!buckets.includes(r.bucket)||!validDate(r.effective_from)||!Number.isFinite(Number(r.points))||Number(r.points)<0)fail('Ellenőrizd a tevékenységet, dátumot és pontot.');
@@ -121,7 +148,7 @@ Deno.serve(async(req)=>{try{
  if(action==='report'){
   const manifest=(await E.HQReport.filter({committed:true},'-created_date',1))[0];if(!manifest)return Response.json({payload:await zip({version:2,activitySchema:1,journalSchema:1,parts:[],settings:{money:'unknown',currency:'HUF',evalYear:new Date().getFullYear(),threshold:15,concentration:35,targets:{},aliases:{},monthlyKpis:[],dormantMonths:2},issues:[]}),manifest:null,admin,employee,manager});
   const chunks=(await all(E.HQChunk,{revision:manifest.revision})).sort((a:any,b:any)=>a.chunk_index-b.chunk_index);if(chunks.length!==manifest.chunk_count)fail('Hiányos mentés.');let s=validateState(await unzip(chunks.map((c:any)=>c.payload).join('')));
-  if(!manager){for(let p of s.parts)p.rows=p.rows.filter((r:any)=>r.employee===employee);s.settings.monthlyKpis=(s.settings.monthlyKpis||[]).filter((r:any)=>r.employee===employee);s.settings.salesActions={};}
+  if(!manager){for(let p of s.parts)p.rows=p.rows.filter((r:any)=>r.employee===employee);s.settings.monthlyKpis=(s.settings.monthlyKpis||[]).filter((r:any)=>r.employee===employee);s.settings.salesActions=Object.fromEntries(Object.entries(s.settings.salesActions||{}).filter(([,a]:any)=>!clean(a?.owner)||personKey(a.owner)===personKey(employee)));}
   const live=await all(E.HQActivity,manager?{archived:false}:{employee,archived:false});for(let r of live){let p=r.date.slice(0,7),part=s.parts.find((x:any)=>x.key==='daily:'+p);if(!part){part={key:'daily:'+p,kind:'daily',period:p,hash:'hq-live',source:'Base44 napi munkalap',rows:[],issues:[]};s.parts.push(part)}part.rows.push({p,date:r.date,employee:r.employee,company:r.company,action:r.action,bucket:r.bucket,orderT:r.order_t??null,quoteT:r.quote_t??null,bendT:r.bend_t??null,points:r.points??null,note:r.note||'',ref:'Base44!'+r.id,__hqLiveId:r.id})}
   s.updatedAt=Date.now();return Response.json({payload:await zip(s),manifest,admin,employee,manager});
  }

@@ -1,0 +1,75 @@
+{
+  "name": "HQTask",
+  "type": "object",
+  "properties": {
+    "employee": {
+      "type": "string"
+    },
+    "owner_email": {
+      "type": "string"
+    },
+    "company_id": {
+      "type": "string"
+    },
+    "company": {
+      "type": "string"
+    },
+    "note": {
+      "type": "string"
+    },
+    "due_date": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "open",
+        "done"
+      ],
+      "default": "open"
+    },
+    "outcome": {
+      "type": "string"
+    },
+    "closed_date": {
+      "type": "string"
+    },
+    "postpone_count": {
+      "type": "number"
+    },
+    "reminder_count": {
+      "type": "number"
+    },
+    "archived": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "employee",
+    "company_id",
+    "note",
+    "due_date"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
