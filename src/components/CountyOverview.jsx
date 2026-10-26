@@ -12,8 +12,8 @@ export default function CountyOverview({canOpen,onOpen,onOpenCounty}){
  if(error)return <section className="hq-card"><p className="hq-hint">A megyei adatok nem töltődtek be: {error}</p></section>;
  return <section className="hq-card">
   <div className="hq-sectionhead"><h2>Megyei lefedettség</h2><span>{data?(short(data.totals.companies)+' cég · '+short(data.totals.order_t)+' t forgalom (12 hó)'):'Betöltés…'}</span></div>
-  <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-   <CountyMap rows={rows} metric="companies" height="420px" onSelect={canOpen?(c=>onOpenCounty&&onOpenCounty(c)):undefined}/>
+  <div className="grid gap-4 lg:grid-cols-[minmax(0,780px)_minmax(280px,1fr)]">
+   <CountyMap rows={rows} metric="companies" onSelect={canOpen?(c=>onOpenCounty&&onOpenCounty(c)):undefined}/>
    <div>
     <h3 className="text-sm font-semibold">Figyelmet igényel</h3>
     {!top.length&&<p className="hq-hint">{data?'Most nincs kiemelt megye.':'Betöltés…'}</p>}

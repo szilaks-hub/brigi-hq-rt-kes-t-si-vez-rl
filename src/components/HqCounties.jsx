@@ -35,8 +35,8 @@ export default function HqCounties({focus,onPickCompany,boot,onRefresh}){
    {!!data?.foreign&&<span className="hq-pill">{data.foreign} külföldi cég</span>}
   </div>
   {!!top&&<p className="hq-hint">Leginkább a <b>{top.county}</b> megyére kell figyelni: {top.reasons.join(' · ')}.</p>}
-  <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
-   <CountyMap rows={rows} metric={metric} selected={sel} onSelect={setSel} height="480px"/>
+  <div className="grid gap-5 lg:grid-cols-[minmax(0,1000px)_minmax(300px,1fr)] lg:items-start">
+   <CountyMap rows={rows} metric={metric} selected={sel} onSelect={setSel}/>
    <CountyRanking rows={rows} attention={data?.attention||[]} selected={sel} onSelect={setSel} metric={metric}/>
   </div>
   </section>
