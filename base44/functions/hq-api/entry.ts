@@ -152,6 +152,35 @@ Deno.serve(async(req)=>{try{
   const live=await all(E.HQActivity,manager?{archived:false}:{employee,archived:false});for(let r of live){let p=r.date.slice(0,7),part=s.parts.find((x:any)=>x.key==='daily:'+p);if(!part){part={key:'daily:'+p,kind:'daily',period:p,hash:'hq-live',source:'Base44 napi munkalap',rows:[],issues:[]};s.parts.push(part)}part.rows.push({p,date:r.date,employee:r.employee,company:r.company,action:r.action,bucket:r.bucket,orderT:r.order_t??null,quoteT:r.quote_t??null,bendT:r.bend_t??null,points:r.points??null,note:r.note||'',ref:'Base44!'+r.id,__hqLiveId:r.id})}
   s.updatedAt=Date.now();return Response.json({payload:await zip(s),manifest,admin,employee,manager});
  }
+ if(action==='companyInfo'){
+  const person=resolveEmployee(),day0=today(),num=(v:any)=>Number.isFinite(Number(v))?Number(v):0,gap=(d:any)=>d?Math.round((Date.parse(day0)-Date.parse(String(d)))/86400000):null;
+  const company=await E.HQCompany.get(clean(body.company_id)).catch(()=>null);if(!company)fail('Ismeretlen cég.',404);
+  const rows=(await all(E.HQActivity,{company_id:company.id,employee:person,archived:false})).sort((a:any,b:any)=>String(b.date).localeCompare(String(a.date)));
+  const tasks=(await all(E.HQTask,{company_id:company.id,employee:person,archived:false})).sort((a:any,b:any)=>String(a.due_date).localeCompare(String(b.due_date)));
+  const lastOrder=rows.find((r:any)=>num(r.order_t)>0)||null,lastOffer=rows.find((r:any)=>r.action==='Ajánlat')||null,sum=(k:string)=>rows.reduce((n:number,r:any)=>n+num(r[k]),0);
+  return Response.json({company:{id:company.id,name:company.name,owners:company.owners||[],countries:company.countries||[],types:company.types||[]},count:rows.length,last:rows[0]?rows[0].date:'',daysSince:gap(rows[0]?rows[0].date:null),lastOrder:lastOrder?{date:lastOrder.date,order_t:num(lastOrder.order_t)}:null,lastOffer:lastOffer?{date:lastOffer.date,quote_t:num(lastOffer.quote_t),note:lastOffer.note||''}:null,offerOpen:!!lastOffer&&(!lastOrder||String(lastOffer.date)>String(lastOrder.date)),totals:{order_t:sum('order_t'),quote_t:sum('quote_t'),bend_t:sum('bend_t'),points:sum('points')},openTasks:tasks.filter((t:any)=>t.status!=='done'),recent:rows.slice(0,8).map((r:any)=>({id:r.id,date:r.date,action:r.action,bucket:r.bucket,order_t:r.order_t,quote_t:r.quote_t,points:r.points,note:r.note}))});
+ }
+ if(action==='suggestions'){
+  const person=resolveEmployee(),day0=today(),num=(v:any)=>Number.isFinite(Number(v))?Number(v):0,gap=(d:any)=>Math.round((Date.parse(day0)-Date.parse(String(d)))/86400000);
+  const rows=(await all(E.HQActivity,{employee:person,archived:false})).sort((a:any,b:any)=>String(b.date).localeCompare(String(a.date)));
+  const open=(await all(E.HQTask,{employee:person,archived:false})).filter((t:any)=>t.status!=='done');
+  const map=new Map(),out:any[]=[];
+  for(const r of rows){const k=r.company_id||r.company;if(!k)continue;let e:any=map.get(k);if(!e){e={company_id:r.company_id,company:r.company,lastContact:r.date,lastOrder:'',lastOffer:'',order_t:0};map.set(k,e)}const tons=num(r.order_t);if(tons>0){e.order_t+=tons;if(!e.lastOrder)e.lastOrder=r.date}if(r.action==='Ajánlat'&&!e.lastOffer)e.lastOffer=r.date}
+  for(const t of open){const late=String(t.due_date)<day0;out.push({company_id:t.company_id,company:t.company,reason:(late?'Lejárt teendő ('+t.due_date+'): ':'Esedékes ('+t.due_date+'): ')+(t.note||'visszahívás'),priority:late?0:1,due:t.due_date,lastContact:'',openTasks:1})}
+  const listed=new Set(open.map((t:any)=>t.company_id));
+  for(const e of map.values()){if(listed.has(e.company_id))continue;const since=gap(e.lastContact);
+   if(e.lastOffer&&(!e.lastOrder||e.lastOffer>e.lastOrder)&&gap(e.lastOffer)>=5){out.push({company_id:e.company_id,company:e.company,reason:'Ajánlatot adtál ('+e.lastOffer+'), azóta nincs rendelés — hívd vissza.',priority:2,due:'',lastContact:e.lastContact,openTasks:0})}
+   else if(since>=21){out.push({company_id:e.company_id,company:e.company,reason:'Nincs kapcsolat '+since+' napja. Utolsó napló: '+e.lastContact+(e.lastOrder?' · utolsó rendelés: '+e.lastOrder+' ('+e.order_t+' t)':''),priority:3,due:'',lastContact:e.lastContact,openTasks:0})}}
+  return Response.json({items:out.sort((a:any,b:any)=>a.priority-b.priority||String(a.due).localeCompare(String(b.due))).slice(0,12),scanned:map.size,open:open.length});
+ }
+ if(action==='plan'){
+  const person=resolveEmployee();let month=clean(body.month);if(!/^20\d{2}-(0[1-9]|1[0-2])$/.test(month))month=today().slice(0,7);
+  const day0=today(),rows=(await all(E.HQActivity,{employee:person,archived:false})).filter((r:any)=>String(r.date).slice(0,7)===month),tasks=await all(E.HQTask,{employee:person,archived:false}),days:any={};
+  const cell=(k:string)=>{if(!days[k])days[k]={date:k,tasks:[],activities:[],points:0,order_t:0,quote_t:0};return days[k]};
+  for(const r of rows){const c=cell(String(r.date)),tons=Number(r.order_t)||0;c.points+=Number(r.points)||0;c.order_t+=tons;c.quote_t+=Number(r.quote_t)||0;c.activities.push({id:r.id,company:r.company,company_id:r.company_id,action:r.action,bucket:r.bucket,order_t:r.order_t,quote_t:r.quote_t,points:r.points,note:r.note})}
+  for(const t of tasks){cell(String(t.due_date)).tasks.push({id:t.id,company:t.company,company_id:t.company_id,note:t.note,status:t.status,outcome:t.outcome,due_date:t.due_date,reminder_count:t.reminder_count||0})}
+  return Response.json({month,today:day0,days:Object.values(days).sort((a:any,b:any)=>a.date.localeCompare(b.date)),open:tasks.filter((t:any)=>t.status!=='done').sort((a:any,b:any)=>String(a.due_date).localeCompare(String(b.due_date)))});
+ }
  if(action==='myResults'){
   const person=resolveEmployee(),from=clean(body.from),to=clean(body.to);
   if((from&&!validDate(from))||(to&&!validDate(to)))fail('Érvénytelen időszak.');
