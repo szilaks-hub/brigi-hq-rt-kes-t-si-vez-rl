@@ -11,6 +11,9 @@
     "county": {
       "type": "string"
     },
+    "city": {
+      "type": "string"
+    },
     "countries": {
       "type": "array",
       "items": {
