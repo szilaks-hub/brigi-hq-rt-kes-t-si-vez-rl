@@ -195,7 +195,7 @@ Deno.serve(async(req)=>{try{
    else if(s.activities<s.companies*0.5){reasons.push('Kevés aktivitás a cégekhez képest ('+s.activities+' aktivitás / '+s.companies+' cég)');score+=2}
    if(reasons.length)attention.push({county:s.county,level:score>=8?'magas':score>=4?'közepes':'alacsony',score,reasons,last3,prev3})}
   attention.sort((a:any,b:any)=>b.score-a.score);
-  return Response.json({today:day0,months,counties,companies:companyRows,totals,monthly,attention,unassigned:companies.filter((c:any)=>!clean(c.county)).length,foreign:(stat.get('Külföld')||{companies:0}).companies});
+  return Response.json({today:day0,months,counties,companies:clean(body.county)?companyRows.filter((c:any)=>c.county===clean(body.county)):[],totals,monthly,attention,unassigned:companies.filter((c:any)=>!clean(c.county)).length,foreign:(stat.get('Külföld')||{companies:0}).companies});
  }
  if(action==='companyInfo'){
   const person=resolveEmployee(),day0=today(),num=(v:any)=>Number.isFinite(Number(v))?Number(v):0,gap=(d:any)=>d?Math.round((Date.parse(day0)-Date.parse(String(d)))/86400000):null;

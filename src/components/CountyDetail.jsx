@@ -7,7 +7,7 @@ const fmt=(n,d=1)=>n==null?'–':Number(n).toLocaleString('hu-HU',{maximumFracti
 const LEVEL={'magas':'border-destructive text-destructive','közepes':'border-primary text-foreground','alacsony':'border-border text-muted-foreground'};
 const SORTS=[['order_t','Forgalom szerint'],['daysSince','Legrégebbi kapcsolat'],['points','Pontok szerint']];
 
-export default function CountyDetail({county,stats,companies=[],attention,onPickCompany}){
+export default function CountyDetail({county,stats,companies=[],loading,attention,onPickCompany}){
  const [sort,setSort]=useState('order_t'),[onlyAttention,setOnlyAttention]=useState(false);
  const list=useMemo(()=>{
   let l=[...companies];
@@ -54,7 +54,8 @@ export default function CountyDetail({county,stats,companies=[],attention,onPick
    <label className="hq-field"><span>Rendezés</span><select value={sort} onChange={e=>setSort(e.target.value)}>{SORTS.map(([k,l])=><option key={k} value={k}>{l}</option>)}</select></label>
    <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={onlyAttention} onChange={e=>setOnlyAttention(e.target.checked)}/> Csak figyelmet igénylő cégek ({attentionCount})</label>
   </div>
-  <div className="hq-tablewrap">
+  {loading&&<p className="hq-empty">Cégek betöltése…</p>}
+  <div className="hq-tablewrap" hidden={loading}>
    <table className="hq-table"><thead><tr><th>Cég</th><th>Felelős</th><th>Utolsó kapcsolat</th><th className="num">Forgalom (12 hó)</th><th className="num">Pont</th><th className="num">Teendő</th><th/></tr></thead>
     <tbody>{list.map(c=>{const needs=(c.daysSince==null||c.daysSince>=60)||c.overdue>0||c.offerOpen;return <tr key={c.id}>
      <td>{c.name}</td>

@@ -13,12 +13,12 @@ export default function CountyOverview({canOpen,onOpen,onOpenCounty}){
  return <section className="hq-card">
   <div className="hq-sectionhead"><h2>Megyei lefedettség</h2><span>{data?(short(data.totals.companies)+' cég · '+short(data.totals.order_t)+' t forgalom (12 hó)'):'Betöltés…'}</span></div>
   <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-   <CountyMap rows={rows} metric="companies" height="420px" onSelect={c=>onOpenCounty&&onOpenCounty(c)}/>
+   <CountyMap rows={rows} metric="companies" height="420px" onSelect={canOpen?(c=>onOpenCounty&&onOpenCounty(c)):undefined}/>
    <div>
     <h3 className="text-sm font-semibold">Figyelmet igényel</h3>
     {!top.length&&<p className="hq-hint">{data?'Most nincs kiemelt megye.':'Betöltés…'}</p>}
     <ul className="mt-2 space-y-2">{top.map(a=><li key={a.county} className="rounded-lg border border-border p-2 text-xs">
-     <button className="font-semibold" onClick={()=>onOpenCounty&&onOpenCounty(a.county)}>{a.county} ↗</button>
+     {canOpen?<button className="font-semibold" onClick={()=>onOpenCounty&&onOpenCounty(a.county)}>{a.county} ↗</button>:<b>{a.county}</b>}
      <ul className="mt-1 list-disc pl-4 text-muted-foreground">{a.reasons.map((r,i)=><li key={i}>{r}</li>)}</ul>
     </li>)}</ul>
     {!!data?.unassigned&&<p className="hq-hint">{data.unassigned} cégnek még nincs megyéje — a Cégtörzsben állítható be.</p>}

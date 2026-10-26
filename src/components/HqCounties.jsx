@@ -10,8 +10,10 @@ export default function HqCounties({focus,onPickCompany}){
  const [data,setData]=useState(null),[loading,setLoading]=useState(true),[error,setError]=useState(''),[metric,setMetric]=useState('companies'),[sel,setSel]=useState(focus||'');
  useEffect(()=>{let live=true;setLoading(true);setError('');api('countyStats').then(d=>{if(live){setData(d);setSel(s=>s||(d.attention[0]?.county||''))}}).catch(e=>{if(live)setError(e.message)}).finally(()=>{if(live)setLoading(false)});return()=>{live=false}},[]);
  const rows=useMemo(()=>{const o={};for(const c of data?.counties||[])o[c.county]=c;return o},[data]);
+ const [detail,setDetail]=useState({county:'',companies:[],loading:false});
+ useEffect(()=>{if(!sel)return;let live=true;setDetail({county:sel,companies:[],loading:true});api('countyStats',{county:sel}).then(d=>{if(live)setDetail({county:sel,companies:d.companies||[],loading:false})}).catch(()=>{if(live)setDetail({county:sel,companies:[],loading:false})});return()=>{live=false}},[sel]);
  const selStats=rows[sel]||null;
- const selCompanies=useMemo(()=>(data?.companies||[]).filter(c=>c.county===sel),[data,sel]);
+ const selCompanies=detail.county===sel?detail.companies:[];
  const selAttention=(data?.attention||[]).find(a=>a.county===sel)||null;
  const top=(data?.attention||[])[0]||null;
  return <>
@@ -31,6 +33,6 @@ export default function HqCounties({focus,onPickCompany}){
   </div>
   {!!data?.unassigned&&<p className="hq-hint">{data.unassigned} cégnek még nincs megyéje, ezért nem jelenik meg a térképen. A Cégtörzsben állítható be, vagy az Excel-importból (Megye oszlop) töltődik.</p>}
  </section>
- <CountyDetail county={sel} stats={selStats} companies={selCompanies} attention={selAttention} onPickCompany={onPickCompany}/>
+ <CountyDetail county={sel} stats={selStats} companies={selCompanies} loading={detail.loading} attention={selAttention} onPickCompany={onPickCompany}/>
  </>;
 }
