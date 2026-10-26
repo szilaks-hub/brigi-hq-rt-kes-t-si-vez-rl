@@ -3,6 +3,7 @@ const actions=['Megrendelés','Ajánlat','Új cég','Kivitt hajlítás'];
 const buckets=['0-4 t','4-8 t','8-15 t','15-24 t','24-50 t','50+ t'];
 const clean=(s:any)=>String(s??'').trim();
 const key=(s:any)=>clean(s).toLocaleLowerCase('hu').replace(/\s+/g,' ');
+const personKey=(s:any)=>key(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'');
 const fail=(message:string,status=400)=>{throw Object.assign(new Error(message),{status})};
 const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Budapest',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 function validDate(s:any){return /^20\d{2}-\d{2}-\d{2}$/.test(s)&&!isNaN(Date.parse(s))&&new Date(s).toISOString().slice(0,10)===s}
@@ -52,7 +53,8 @@ Deno.serve(async(req)=>{try{
 
  if(action==='bootstrap'){
   const [companies,rules,manifests]=await Promise.all([all(E.HQCompany),ruleList(),E.HQReport.filter({committed:true},'-created_date',1)]);
-  return Response.json({user:{id:user.id,email:user.email,name:user.full_name},admin,manager,employee,members:admin?members:[],companies:companies.filter((c:any)=>c.active),rules,manifest:manifests[0]||null,actions,buckets,today:today()});
+  const assignedToEmployee=(c:any)=>admin||manager||(c.owners||[]).some((o:any)=>personKey(o)===personKey(employee));
+  return Response.json({user:{id:user.id,email:user.email,name:user.full_name},admin,manager,employee,members:admin?members:[],companies:companies.filter((c:any)=>c.active&&assignedToEmployee(c)),rules,manifest:manifests[0]||null,actions,buckets,today:today()});
  }
  if(action==='getDay'||action==='openDay'||action==='setDayStatus'){
   let day=clean(body.date),person=resolveEmployee();if(!validDate(day))fail('Érvénytelen dátum.');
@@ -72,6 +74,7 @@ Deno.serve(async(req)=>{try{
   if(previous&&body.expected_updated!==previous.updated_date)fail('Ezt a sort időközben módosították. Frissítsd a munkalapot.',409);
   if(action==='archiveRow'){if(!previous)fail('Nincs ilyen sor.');return Response.json({row:await E.HQActivity.update(previous.id,{archived:true})})}
   const data=safeRow(body.row),company=await E.HQCompany.get(data.company_id);if(!company?.active)fail('A cég nem aktív.');
+  if(!admin&&!manager&&!(company.owners||[]).some((o:any)=>personKey(o)===personKey(employee)))fail('Ez a cég nincs hozzád rendelve.',403);
   if(!data.client_key)fail('Hiányzó sorazonosító.');
   if(!previous){const retry=(await all(E.HQActivity,{client_key:data.client_key,employee:person}))[0];if(retry)return Response.json({row:retry})}
   const candidates=(await ruleList()).filter((r:any)=>r.enabled&&r.action===data.action&&(!r.bucket||r.bucket===data.bucket)&&r.effective_from<=day).sort((a:any,b:any)=>(Number(!!b.bucket)-Number(!!a.bucket))||b.effective_from.localeCompare(a.effective_from)||b.created_date.localeCompare(a.created_date));
