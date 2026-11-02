@@ -32,6 +32,14 @@
 .hq-radial-tool:hover{border-color:#a9bede}
 .hq-radial-tool.prominent{border-color:#c3e271;background:linear-gradient(135deg,#ffffff,#f4ffd9);color:#42601a}
 .hq-radial-panel{position:absolute;left:0;bottom:112px;width:min(430px,calc(100vw - 44px));max-height:58vh;overflow:auto;padding:16px 18px;border-radius:20px;border:1px solid #cddbee;background:#fdfefff5;backdrop-filter:blur(20px);box-shadow:0 26px 60px #263d5b33}
+.hq-menu-panel{bottom:110px;max-height:72vh}
+.hq-menu-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.hq-menu-tools{margin-top:10px;padding-top:11px;border-top:1px solid #e4ecf7}
+.hq-menu-tile{display:flex;align-items:center;gap:9px;padding:12px 11px;border-radius:14px;border:1px solid #d6e1f0;background:linear-gradient(135deg,#fff,#f4f8ff);color:#42608d;font-size:11.5px;font-weight:650;text-align:left;cursor:pointer;transition:.16s}
+.hq-menu-tile:hover{border-color:#9db6de;background:#fff}
+.hq-menu-tile svg{flex-shrink:0}
+.hq-menu-tile.active{border-color:#7d9fe0;color:#2f55c4;box-shadow:inset 0 1px 0 #fff,0 4px 14px #4875d51a}
+.hq-menu-tile.prominent{border-color:#c3e271;background:linear-gradient(135deg,#fff,#f4ffd9);color:#42601a}
 .hq-radial-panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:6px;font-size:13px}
 .hq-radial-panel .hq-navgroup>p{margin:13px 4px 6px}
 .hq-radial-panel .hq-navgroup button{width:100%;display:flex;gap:9px;align-items:center;text-align:left;border-radius:11px;padding:9px 10px;font-size:11px;font-weight:600;border:1px solid transparent;color:#63758e;background:transparent;cursor:pointer}
@@ -61,4 +69,4 @@
 .hq-modal-title{font-size:17px;font-weight:700;color:#2b4a76}
 .hq-modal .hq-actions{margin-top:6px}
 @media print{.hq-radial,.hq-radial-sheet,.hq-modal-shade{display:none!important}}
-@media(max-width:800px){.hq-radial-sheet-grid,.hq-radial-sheet-tools{grid-template-columns:1fr}.hq-top-logo{height:28px;width:52px}}
+@media(max-width:800px){.hq-radial-sheet-grid,.hq-radial-sheet-tools{grid-template-columns:1fr}.hq-top-logo{height:28px;width:52px}.hq-radial{left:14px;bottom:14px}.hq-menu-grid{grid-template-columns:1fr}.hq-menu-panel{width:calc(100vw - 32px);max-height:74vh}}

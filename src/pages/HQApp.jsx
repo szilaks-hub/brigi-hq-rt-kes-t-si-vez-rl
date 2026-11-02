@@ -154,15 +154,15 @@ async function ungz64(s){return JSON.parse(await new Response(new Blob([Uint8Arr
 function Reports({boot,setError,request,active,onNavigate,refreshKey,handleRef}){
  const frame=useRef(null),report=useRef(null),loadingRef=useRef(false),savingRef=useRef(false),ready=useRef(false),latest=useRef({request,active,onNavigate}),[html,setHtml]=useState(''),[status,setStatus]=useState('Kimutatás betöltése…'),[failed,setFailed]=useState(false),lastRefresh=useRef(refreshKey),askSeq=useRef(0),askWait=useRef(new Map());
  latest.current={request,active,onNavigate};
- const post=data=>frame.current?.contentWindow?.postMessage(data,location.origin);
+ const post=data=>frame.current?.contentWindow?.postMessage(data,'*');
  const route=()=>{const q=latest.current.request;if(ready.current&&report.current&&latest.current.active)post({type:'hq-route',view:q.view,snapshot:q.snapshot})};
- const init=()=>{if(ready.current&&report.current)post({type:'hq-init',state:report.current.state,admin:boot.admin,allow:boot.admin||boot.manager?null:['overview','attention'],view:latest.current.request.view})};
+ const init=()=>{if(!report.current)return;post({type:'hq-init',state:report.current.state,admin:boot.admin,allow:boot.admin||boot.manager?null:['overview','attention'],view:latest.current.request.view})};
  const load=async()=>{if(loadingRef.current||savingRef.current)return;loadingRef.current=true;setFailed(false);try{setStatus('Közös adatok és napi munkalapok betöltése…');const [r,h]=await Promise.all([call('report'),html?Promise.resolve(html):fetch('/hq-legacy.html').then(r=>{if(!r.ok)throw Error('A kimutatás felülete nem töltődött be.');return r.text()})]);report.current={...r,state:await ungz64(r.payload)};if(!html)setHtml(h);else init();setStatus('')}catch(e){setFailed(true);setStatus(e.message);setError(e.message)}finally{loadingRef.current=false}};
  useEffect(()=>{route()},[request]);
  useEffect(()=>{if(active&&lastRefresh.current!==refreshKey){lastRefresh.current=refreshKey;load()}},[active,refreshKey]);
  useEffect(()=>{
   load();
-  const handler=async e=>{if(e.source!==frame.current?.contentWindow||e.origin!==location.origin)return;const msg=e.data;
+  const handler=async e=>{if(!frame.current||e.source!==frame.current.contentWindow)return;const msg=e.data;
    if(msg?.type==='hq-ready'){ready.current=true;init()}
    if(msg?.type==='hq-navigation'){latest.current.onNavigate(msg.snapshot)}
    if(msg?.type==='hq-initialized'){route()}
@@ -177,5 +177,5 @@ function Reports({boot,setError,request,active,onNavigate,refreshKey,handleRef})
   window.addEventListener('message',handler);const warn=e=>{if(savingRef.current){e.preventDefault();e.returnValue=''}};window.addEventListener('beforeunload',warn); handleRef.current={refresh:load,ask:company=>new Promise(resolve=>{if(!company||!ready.current){resolve(null);return}const id=++askSeq.current,timer=setTimeout(()=>{askWait.current.delete(id);resolve(null)},12000);askWait.current.set(id,info=>{clearTimeout(timer);resolve(info)});post({type:'hq-company-ask',id,company})})};
   return()=>{window.removeEventListener('message',handler);window.removeEventListener('beforeunload',warn)};
  },[]);
- return <><div className="hq-reportbar"><span><i className="hq-live-dot"/>{status||(boot.manager?'Teljes kimutatás · közös, mentett adatok':'Saját forgalmad és napi aktivitásod')}</span><Btn disabled={loadingRef.current||savingRef.current} onClick={load}>{failed?'Újrapróbálás':'Adatok frissítése'}</Btn></div>{html?<iframe title="BRIGI HQ teljes értékesítési kimutatás" ref={frame} srcDoc={html} className="hq-reportframe" sandbox="allow-scripts allow-same-origin allow-downloads allow-modals" allow="clipboard-write"/>:<div className="hq-empty">{status}</div>}</>;
+ return <><div className="hq-reportbar"><span><i className="hq-live-dot"/>{status||(boot.manager?'Teljes kimutatás · közös, mentett adatok':'Saját forgalmad és napi aktivitásod')}</span><Btn disabled={loadingRef.current||savingRef.current} onClick={load}>{failed?'Újrapróbálás':'Adatok frissítése'}</Btn></div>{html?<iframe title="BRIGI HQ teljes értékesítési kimutatás" ref={frame} srcDoc={html} onLoad={()=>{init();setStatus('')}} className="hq-reportframe" sandbox="allow-scripts allow-same-origin allow-downloads allow-modals" allow="clipboard-write"/>:<div className="hq-empty">{status}</div>}</>;
 }
