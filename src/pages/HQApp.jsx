@@ -156,16 +156,24 @@ function Reports({boot,setError,request,active,onNavigate,refreshKey,handleRef})
  latest.current={request,active,onNavigate};
  const post=data=>frame.current?.contentWindow?.postMessage(data,'*');
  const route=()=>{const q=latest.current.request;if(ready.current&&report.current&&latest.current.active)post({type:'hq-route',view:q.view,snapshot:q.snapshot})};
- const init=()=>{if(!report.current)return;post({type:'hq-init',state:report.current.state,admin:boot.admin,allow:boot.admin||boot.manager?null:['overview','attention'],view:latest.current.request.view})};
- const load=async()=>{if(loadingRef.current||savingRef.current)return;loadingRef.current=true;setFailed(false);try{setStatus('Közös adatok és napi munkalapok betöltése…');const [r,h]=await Promise.all([call('report'),html?Promise.resolve(html):fetch('/hq-legacy.html').then(r=>{if(!r.ok)throw Error('A kimutatás felülete nem töltődött be.');return r.text()})]);report.current={...r,state:await ungz64(r.payload)};if(!html)setHtml(h);else init();setStatus('')}catch(e){setFailed(true);setStatus(e.message);setError(e.message)}finally{loadingRef.current=false}};
+ const init=()=>{const w=frame.current?.contentWindow;if(!report.current||!w)return;
+  const payload={state:report.current.state,admin:boot.admin,allow:boot.admin||boot.manager?null:['overview','attention'],view:latest.current.request.view};
+  try{if(typeof w.__HQ_INIT__==='function'){w.__HQ_INIT__(payload);return}}catch(err){}
+  post({type:'hq-init',...payload});
+ };
+ const load=async()=>{if(loadingRef.current||savingRef.current)return;loadingRef.current=true;setFailed(false);try{setStatus('Közös adatok és napi munkalapok betöltése…');const [r,h]=await Promise.all([call('report'),html?Promise.resolve(html):fetch('/hq-legacy.html').then(r=>{if(!r.ok)throw Error('A kimutatás felülete nem töltődött be.');return r.text()})]);report.current={...r,state:await ungz64(r.payload)};if(!html)setHtml(h);else init();setStatus('');
+   setTimeout(()=>{if(!ready.current)setStatus('A kimutatás motorja nem indult el. Nyomd meg az „Adatok frissítése” gombot, vagy töltsd újra az oldalt.')},15000);
+  }catch(e){setFailed(true);setStatus(e.message);setError(e.message)}finally{loadingRef.current=false}};
  useEffect(()=>{route()},[request]);
  useEffect(()=>{if(active&&lastRefresh.current!==refreshKey){lastRefresh.current=refreshKey;load()}},[active,refreshKey]);
  useEffect(()=>{
   load();
   const handler=async e=>{if(!frame.current||e.source!==frame.current.contentWindow)return;const msg=e.data;
    if(msg?.type==='hq-ready'){ready.current=true;init()}
+   if(msg?.type==='hq-stage'){setStatus(msg.text||'')}
+   if(msg?.type==='hq-error'){setStatus('A kimutatás nem épült fel: '+msg.message)}
    if(msg?.type==='hq-navigation'){latest.current.onNavigate(msg.snapshot)}
-   if(msg?.type==='hq-initialized'){route()}
+   if(msg?.type==='hq-initialized'){setStatus('');route()}
    if(msg?.type==='hq-company-info'){const wait=askWait.current.get(msg.id);if(wait){askWait.current.delete(msg.id);wait(msg.info)}}
    if(msg?.type==='hq-save'){
     const send=data=>post({type:'hq-saved',id:msg.id,...data});

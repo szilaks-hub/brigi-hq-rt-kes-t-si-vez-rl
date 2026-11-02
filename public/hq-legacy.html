@@ -461,7 +461,7 @@ let result={};for(let el of wb.getElementsByTagName('sheet')){let name=el.getAtt
 return result;
 }
 function readCsv(text){text=text.replace(/^\uFEFF/,'');let first=text.split(/\r?\n/)[0],sep=first.split(';').length>=first.split(',').length?';':',';let rows=[],r=[],v='',quoted=false;for(let i=0;i<text.length;i++){let c=text[i];if(c==='"'){if(quoted&&text[i+1]==='"'){v+='"';i++}else quoted=!quoted}else if(c===sep&&!quoted){r.push(v);v=''}else if((c==='\n'||c==='\r')&&!quoted){if(c==='\r'&&text[i+1]==='\n')i++;r.push(v);rows.push(r);r=[];v=''}else v+=c}if(v||r.length){r.push(v);rows.push(r)}return rows}
-</script><script>'use strict';
+</script><script>'use strict';window.addEventListener('error',function(ev){try{parent.postMessage({type:'hq-error',message:String(ev.message||'ismeretlen hiba')+' @'+(ev.lineno||'')},'*')}catch(e){}});
 const $=id=>document.getElementById(id),esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt=(n,d=0)=>n==null||!Number.isFinite(n)?'Nincs adat':n.toLocaleString('hu-HU',{minimumFractionDigits:d,maximumFractionDigits:d});
 const t=n=>fmt(n,1),pct=n=>n==null?'Nincs bázis':fmt(n,1)+'%',sign=n=>n>0?'+':'';
@@ -999,6 +999,21 @@ confirmClearWorkspace=function(){
  $('cloudClearConfirm').onclick=async()=>{if($('cloudClearWord').value.trim().toUpperCase()!=='TÖRLÉS')return;let b=$('cloudClearConfirm');b.disabled=true;try{let empty=ActivityKPI.empty();empty.parts=state.parts.map(p=>({...p,rows:p.rows.filter(r=>r.__hqLiveId)})).filter(p=>p.rows.length);await persistWorkspace(empty);state=empty;f={...f,start:'',end:'',employee:'',team:'',country:'',category:'',company:''};stopMonths();rebuild();closeModal();setView('data');toast('A közös kimutatás kiürítve. Betöltheted a friss Excel-fájlokat.')}catch(e){b.disabled=false;toast('A törlés nem sikerült: '+e.message)}};
 };
 
+window.__HQ_INIT__=function(p){
+ const stage=t=>{try{parent.postMessage({type:'hq-stage',text:t},'*')}catch(e){}};
+ try{
+  stage('Kimutatás: adatok ellenőrzése…');
+  cloudAdmin=!!p.admin;tabAllow=Array.isArray(p.allow)&&p.allow.length?p.allow:null;
+  state=validateState(p.state);
+  stage('Kimutatás: nézetek felépítése…');
+  rebuild();
+  stage('Kimutatás: megjelenítés…');
+  render();
+  if(p.view){try{setView(p.view)}catch(e){}}
+  try{$('storageStatus').textContent='Közös Base44 adatok betöltve.'}catch(e){}
+  busy('');stage('');parent.postMessage({type:'hq-initialized'},'*');
+ }catch(err){busy('');try{$('screen').innerHTML='<div class="notice red">'+esc(err.message)+'</div>'}catch(e){}parent.postMessage({type:'hq-error',message:err.message},'*')}
+};
 parent.postMessage({type:'hq-ready'},'*');
 
 </script>
