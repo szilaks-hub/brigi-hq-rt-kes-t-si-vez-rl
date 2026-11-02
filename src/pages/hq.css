@@ -68,5 +68,8 @@
 .hq-modal{width:min(560px,94vw);max-height:88vh;overflow:auto;padding:24px;border-radius:22px;background:#fdffff;box-shadow:0 30px 80px #23375a45;display:flex;flex-direction:column;gap:12px}
 .hq-modal-title{font-size:17px;font-weight:700;color:#2b4a76}
 .hq-modal .hq-actions{margin-top:6px}
+.hq-table tbody tr.hq-missing>td{background:#fdeaea}
+.hq-table tbody tr.hq-missing>td:first-child{box-shadow:inset 3px 0 0 #d92d20}
+.hq-missing-tag{display:inline-block;margin-left:8px;padding:1px 7px;border-radius:999px;background:#d92d20;color:#fff;font-size:10px;font-weight:700;vertical-align:middle}
 @media print{.hq-radial,.hq-radial-sheet,.hq-modal-shade{display:none!important}}
 @media(max-width:800px){.hq-radial-sheet-grid,.hq-radial-sheet-tools{grid-template-columns:1fr}.hq-top-logo{height:28px;width:52px}.hq-radial{left:14px;bottom:14px}.hq-menu-grid{grid-template-columns:1fr}.hq-menu-panel{width:calc(100vw - 32px);max-height:74vh}}
