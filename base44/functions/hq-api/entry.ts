@@ -322,7 +322,7 @@ Deno.serve(async(req)=>{try{
  }
  if(action==='rulePreview'){
   const day=clean(body.day)||today();if(!validDate(day))fail('Érvénytelen dátum.');
-  const wanted=clean(body.action),versions=await closedRuleVersions(E,day),bands:any[]=[];
+  const wanted=clean(body.activity),versions=await closedRuleVersions(E,day),bands:any[]=[];
   for(const b of buckets){const m=pickRule(versions,wanted,b);bands.push({bucket:b,points:m?Number(m.rule.points):null,min:m?m.rule.min:null,max:m?m.rule.max:null,label:m?Number(m.version.version)+'. verzió · érvényes '+m.version.effective_from+' óta':'Nincs pontszabály'})}
   const general=pickRule(versions,wanted,''),match=pickRule(versions,wanted,clean(body.bucket));
   return Response.json({day,action:wanted,bucket:clean(body.bucket),points:match?Number(match.rule.points):null,label:match?Number(match.version.version)+'. verzió · érvényes '+match.version.effective_from+' óta':'Nincs pontszabály erre a napra.',general:general?{points:Number(general.rule.points),version:general.version.version,effective_from:general.version.effective_from}:null,bands,closed:versions.length,today:today()});
