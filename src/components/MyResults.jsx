@@ -14,7 +14,11 @@ const Stat=({label,value,unit})=><div className="hq-stat"><span>{label}</span><s
 
 export default function MyResults({boot,setError}){
  const [period,setPeriod]=useState('month'),[person,setPerson]=useState(boot.employee),[data,setData]=useState(null),[loading,setLoading]=useState(true);
- const people=useMemo(()=>[...new Set([boot.employee,...boot.members.map(m=>m.employee)])].sort((a,b)=>a.localeCompare(b,'hu')),[boot]);
+ const [teamFilter,setTeamFilter]=useState('');
+ const allPeople=useMemo(()=>[...new Set([boot.employee,...boot.members.map(m=>m.employee)])].sort((a,b)=>a.localeCompare(b,'hu')),[boot]);
+ const teams=useMemo(()=>[...new Set(boot.members.map(m=>m.team).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'hu')),[boot]);
+ const peopleOfTeam=t=>t?allPeople.filter(p=>boot.members.some(m=>m.team===t&&m.employee===p)):allPeople;
+ const people=peopleOfTeam(teamFilter);
  useEffect(()=>{let live=true;const from=range(period);setLoading(true);
   api('myResults',{employee:person,from:from[0],to:from[1]}).then(r=>{if(live)setData(r)}).catch(e=>{if(live)setError(e.message)}).finally(()=>{if(live)setLoading(false)});
   return()=>{live=false}},[period,person]);
@@ -23,7 +27,8 @@ export default function MyResults({boot,setError}){
  <section className="hq-hero"><div><span className="hq-eyebrow">SAJÁT EREDMÉNY</span><h1>A pontjaid és az eredményeid.</h1><p>A napi munkalapon rögzített aktivitásaid összesítve. A pontot minden sorhoz a munkanapjára érvényes pontszabály adja.</p></div><div className="hq-orbit"><b>{fmt(totals.points,0)}</b><span>pont</span></div></section>
  <div className="hq-card hq-controls">
   <label className="hq-field"><span>Időszak</span><select value={period} onChange={e=>setPeriod(e.target.value)}>{MONTHS.map(([k,l])=><option key={k} value={k}>{l}</option>)}</select></label>
-  {boot.admin&&<label className="hq-field"><span>Kolléga</span><select value={person} onChange={e=>setPerson(e.target.value)}>{people.map(p=><option key={p}>{p}</option>)}</select></label>}
+  {boot.admin&&teams.length>0&&<label className="hq-field"><span>Csapat</span><select value={teamFilter} onChange={e=>{const t=e.target.value;setTeamFilter(t);const list=peopleOfTeam(t);if(!list.includes(person))setPerson(list[0]||boot.employee)}}><option value="">Minden csapat</option>{teams.map(t=><option key={t}>{t}</option>)}</select></label>}
+   {boot.admin&&<label className="hq-field"><span>Kolléga</span><select value={person} onChange={e=>setPerson(e.target.value)}>{people.map(p=><option key={p}>{p}</option>)}</select></label>}
   <span className="hq-pill">{loading?'Betöltés…':(data?.employee||person)+' · '+(data?.rows||0)+' aktivitás'}</span>
  </div>
  <div className="hq-stats"><Stat label="Összegyűjtött pont" value={fmt(totals.points,2)} unit="pont"/><Stat label="Rögzített aktivitás" value={data?.rows||0} unit="db"/><Stat label="Naplózott rendelés" value={fmt(totals.order_t,2)} unit="t"/><Stat label="Ajánlati mennyiség" value={fmt(totals.quote_t,2)} unit="t"/><Stat label="Kivitt hajlítás" value={fmt(totals.bend_t,2)} unit="t"/></div>

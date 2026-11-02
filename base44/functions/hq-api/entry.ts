@@ -585,5 +585,28 @@ Deno.serve(async(req)=>{try{
   const ranked=(bag:any)=>Object.values(bag).sort((a:any,b:any)=>b.points-a.points||b.count-a.count);
   return Response.json({employee:person,rows:rows.length,pending,totals:{points,order_t,quote_t,bend_t},byAction:ranked(actions),byCompany:ranked(companies).slice(0,12),byMonth:Object.values(months).sort((a:any,b:any)=>b.month.localeCompare(a.month))});
  }
+ if(action==='teamCompare'){
+ const scopeAll=admin||manager,from=clean(body.from),to=clean(body.to);
+ if((from&&!validDate(from))||(to&&!validDate(to)))fail('Érvénytelen időszak.');
+ if(from&&to&&from>to)fail('A kezdő dátum későbbi a záró dátumnál.');
+ const day0=today(),wanted=clean(body.team);
+ const [memberRows,rowsAll,taskRows,dayRows]=await Promise.all([all(E.HQMember),all(E.HQActivity,{archived:false}),all(E.HQTask,{archived:false}),all(E.HQDay)]);
+ const memberTeam=new Map<string,string>();
+ for(const m of memberRows)if(m.active!==false&&clean(m.employee))memberTeam.set(key(m.employee),clean(m.team));
+ const teams=[...new Set(memberRows.filter((m:any)=>m.active!==false).map((m:any)=>clean(m.team)).filter(Boolean))].sort((a:string,b:string)=>a.localeCompare(b,'hu'));
+ const map=new Map<string,any>();
+ const bucket=(raw:any)=>{const k=key(raw);if(!map.has(k))map.set(k,{employee:clean(raw),team:memberTeam.get(k)||'',activities:0,points:0,pending:0,order_t:0,quote_t:0,bend_t:0,orders:0,offers:0,openTasks:0,overdue:0,closedDays:0,last:''});return map.get(k)};
+ const rows=rowsAll.filter((r:any)=>(scopeAll||r.employee===employee)&&(from?String(r.date)>=from:true)&&(to?String(r.date)<=to:true));
+ for(const r of rows){const e=bucket(r.employee);e.activities++;if(r.points===null||r.points===undefined)e.pending++;else e.points+=num0(r.points);e.order_t+=num0(r.order_t);e.quote_t+=num0(r.quote_t);e.bend_t+=num0(r.bend_t);if(num0(r.order_t)>0)e.orders++;if(r.action==='Ajánlat')e.offers++;if(String(r.date)>e.last)e.last=String(r.date)}
+ for(const m of memberRows){if(m.active===false||!clean(m.employee))continue;if(!scopeAll&&m.employee!==employee)continue;bucket(m.employee)}
+ for(const t of taskRows){if(clean(t.status)==='done')continue;if(!scopeAll&&t.employee!==employee)continue;const e=bucket(t.employee);e.openTasks++;if(String(t.due_date)<day0)e.overdue++}
+ for(const d of dayRows){if(clean(d.status)!=='closed')continue;if(!scopeAll&&d.employee!==employee)continue;const dd=String(d.date||'');if((from&&dd<from)||(to&&dd>to))continue;bucket(d.employee).closedDays++}
+ let list=[...map.values()].filter((e:any)=>scopeAll||e.employee===employee);
+ if(wanted)list=list.filter((e:any)=>e.team===wanted);
+ list=list.map((e:any)=>({...e,points:Math.round(e.points*100)/100,order_t:Math.round(e.order_t*1000)/1000,quote_t:Math.round(e.quote_t*1000)/1000,bend_t:Math.round(e.bend_t*1000)/1000})).sort((a:any,b:any)=>b.points-a.points||b.order_t-a.order_t||a.employee.localeCompare(b.employee,'hu'));
+ const totals=list.reduce((o:any,e:any)=>{for(const k of ['activities','points','order_t','quote_t','bend_t','orders','offers','openTasks','overdue','closedDays','pending'])o[k]+=e[k];return o},{activities:0,points:0,order_t:0,quote_t:0,bend_t:0,orders:0,offers:0,openTasks:0,overdue:0,closedDays:0,pending:0});
+ totals.people=list.length;totals.avgPoints=list.length?Math.round(totals.points/list.length*100)/100:0;
+ return Response.json({from,to,team:wanted,teams,today:day0,scope:scopeAll?'mind':'saját',employees:list,totals});
+ }
  fail('Ismeretlen művelet.');
-}catch(e){return Response.json({error:e.message||'Hiba történt.'},{status:e.status||500})}});
+ }catch(e){return Response.json({error:e.message||'Hiba történt.'},{status:e.status||500})}});
