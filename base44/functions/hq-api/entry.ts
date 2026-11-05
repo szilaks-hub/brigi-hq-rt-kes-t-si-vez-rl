@@ -449,7 +449,10 @@ Deno.serve(async(req)=>{try{
   // Authoritative company names from the uploaded export. Keep stable IDs and CRM history.
   const master=await all(E.HQCompany),masterMap=new Map(master.map((c:any)=>[key(c.name),c])),incoming=new Map<string,any>();
   for(const r of rows){const k=key(r.company),v=incoming.get(k)||{name:r.company,owners:[],teams:[],countries:[],types:[]};for(const f of ['owners','teams','countries','types'])v[f]=[...new Set([...v[f],...(r.company_meta?.[f]||[])])];if(!v.types.length)v.types=[r.kind==='sales'?'vevő':'szállító'];incoming.set(k,v)}
-  for(const c of incoming.values()){const old:any=masterMap.get(key(c.name)),patch:any={name:c.name,source:pkg.file_name};for(const f of ['owners','teams','countries','types'])patch[f]=c[f].length?c[f]:(old?.[f]||[]);if(old)await E.HQCompany.update(old.id,patch);else{const fresh=await E.HQCompany.create({...patch,active:true});masterMap.set(key(c.name),fresh)}}
+  const companyCreates:any[]=[],companyUpdates:any[]=[];
+  for(const c of incoming.values()){const old:any=masterMap.get(key(c.name)),patch:any={name:c.name,source:pkg.file_name};for(const f of ['owners','teams','countries','types'])patch[f]=c[f].length?c[f]:(old?.[f]||[]);if(!old)companyCreates.push({...patch,active:true});else if(Object.keys(patch).some(k=>JSON.stringify(old[k])!==JSON.stringify(patch[k])))companyUpdates.push({id:old.id,...patch})}
+  for(let i=0;i<companyCreates.length;i+=200)await E.HQCompany.bulkCreate(companyCreates.slice(i,i+200));
+  for(let i=0;i<companyUpdates.length;i+=200)await E.HQCompany.bulkUpdate(companyUpdates.slice(i,i+200));
 
   const others=(await all(E.HQTrafficPackage)).filter((p:any)=>p.status==='active'&&p.revision!==revision);
   for(const p of others){
@@ -467,11 +470,20 @@ Deno.serve(async(req)=>{try{
   requireAdmin();
   const pkg=await E.HQTrafficPackage.get(clean(body.id)).catch(()=>null);if(!pkg)fail('Nincs ilyen csomag.',404);
   if(pkg.status==='active')fail('Ez a csomag már aktív.');
-  if(pkg.status==='withdrawn')fail('A visszavont csomag nem állítható vissza. Töltsd fel újra a fájlt.');
+  if(pkg.status!=='superseded')fail('Csak korábban jóváhagyott, lecserélt csomag állítható vissza.');
+  if(!pkg.report_revision)fail('Ehhez a régi csomaghoz nincs közös riportmentés. A forrásfájlt töltsd fel újra.');
+  const savedChunks=(await all(E.HQChunk,{revision:pkg.report_revision})).sort((a:any,b:any)=>a.chunk_index-b.chunk_index);
+  if(savedChunks.length!==pkg.report_chunk_count||savedChunks.some((c:any,i:number)=>c.chunk_index!==i))fail('A korábbi riportmentés hiányos.',409);
+  const savedState=validateState(await unzip(savedChunks.map((c:any)=>c.payload).join(''))),current=await legacyState(E),restoredState=current?.state||savedState;
+  restoredState.parts=restoredState.parts.filter((p:any)=>!['sales','purchase'].includes(p.kind)).concat(savedState.parts.filter((p:any)=>['sales','purchase'].includes(p.kind)));
+  const restoredRevision=crypto.randomUUID(),restoredPayload=await zip(restoredState),restoredCount=Math.ceil(restoredPayload.length/8000),restoredChunks=[];
+  for(let i=0;i<restoredCount;i++)restoredChunks.push({revision:restoredRevision,chunk_index:i,payload:restoredPayload.slice(i*8000,(i+1)*8000)});
   const rows=await all(E.HQTrafficAgg,{package_revision:pkg.revision});if(!rows.length)fail('A csomaghoz nem tartozik forgalmi adat.',409);
   const others=(await all(E.HQTrafficPackage)).filter((p:any)=>p.status==='active'&&p.revision!==pkg.revision);
   for(const p of others){await E.HQTrafficPackage.update(p.id,{status:'superseded',superseded_at:dayTime()});const oldRows=await all(E.HQTrafficAgg,{package_revision:p.revision,active:true});for(let i=0;i<oldRows.length;i+=300)await E.HQTrafficAgg.bulkUpdate(oldRows.slice(i,i+300).map((r:any)=>({id:r.id,active:false})))}
   for(let i=0;i<rows.length;i+=300)await E.HQTrafficAgg.bulkUpdate(rows.slice(i,i+300).map((r:any)=>({id:r.id,active:true})));
+  for(let i=0;i<restoredChunks.length;i+=200)await E.HQChunk.bulkCreate(restoredChunks.slice(i,i+200));
+  await E.HQReport.create({revision:restoredRevision,chunk_count:restoredCount,committed:true,source:'VECTORY visszaállítás: '+pkg.file_name,rows:restoredState.parts.reduce((n:number,p:any)=>n+p.rows.length,0)});
   const restored=await E.HQTrafficPackage.update(pkg.id,{status:'active',approved_by:employee,approved_at:dayTime(),superseded_at:'',currency_confirmed:pkg.currency_confirmed===true});
   await audit(E,user,{action:'forgalmi csomag visszaállítása',target_kind:'hqtrafficpackage',target_id:pkg.id,target_label:pkg.label||pkg.file_name,reason:clean(body.reason),before:{status:pkg.status},after:{status:'active'}});
   return Response.json({package:restored,superseded:others.length});
