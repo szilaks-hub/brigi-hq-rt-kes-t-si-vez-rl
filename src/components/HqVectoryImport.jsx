@@ -11,7 +11,7 @@ const STATUS={staged:'Előkészítve',active:'Aktív adatkészlet',superseded:'L
 
 export default function HqVectoryImport({boot,setNote,setError,onImported}){
  const [file,setFile]=useState(null),[parsed,setParsed]=useState(null),[progress,setProgress]=useState(''),[busy,setBusy]=useState(''),[localError,setLocalError]=useState('');
- const [revision,setRevision]=useState(''),[preview,setPreview]=useState(null),[currency,setCurrency]=useState('HUF'),[confirmed,setConfirmed]=useState(false),[note,setLocalNote]=useState('');
+ const [revision,setRevision]=useState(''),[preview,setPreview]=useState(null),[currency,setCurrency]=useState(''),[confirmed,setConfirmed]=useState(false),[note,setLocalNote]=useState('');
  const [packages,setPackages]=useState([]),[active,setActive]=useState(null),[refreshKey,setRefreshKey]=useState(0);
  const fileRef=useRef(null);
  useEffect(()=>{let live=true;api('trafficPackages').then(d=>{if(live){setPackages(d.packages||[]);setActive(d.active||null)}}).catch(e=>setLocalError(e.message));return()=>{live=false}},[refreshKey]);
@@ -20,7 +20,7 @@ export default function HqVectoryImport({boot,setNote,setError,onImported}){
   return {sales:agg('sales'),purchase:agg('purchase')}},[parsed]);
 
  const pick=async f=>{if(!f)return;setLocalError('');setPreview(null);setParsed(null);setRevision('');setConfirmed(false);setBusy('parse');setFile(f);
-  try{const result=await parseTrafficFile(f,p=>setProgress(p));setParsed(result);setCurrency(result.sheets.map(s=>s.aggregates.map(a=>a.net)).length?'HUF':'HUF');setProgress('')}
+  try{const result=await parseTrafficFile(f,p=>setProgress(p));setParsed(result);setCurrency('');setProgress('')}
   catch(e){setLocalError(e.message);setFile(null)}finally{setBusy('')}};
 
  const stage=async()=>{if(!parsed)return;setBusy('stage');setLocalError('');const rev=crypto.randomUUID();setRevision(rev);
@@ -47,7 +47,7 @@ export default function HqVectoryImport({boot,setNote,setError,onImported}){
   }catch(e){setLocalError(e.message);setError(e.message)}finally{setBusy('');setProgress('')}};
 
  const approve=async()=>{setBusy('approve');setLocalError('');
-  try{const d=await api('trafficApprove',{revision,currency,currency_confirmed:confirmed,note});
+  try{const d=await api('trafficApprove',{revision,currency,currency_confirmed:confirmed&&!!currency.trim(),note});
    await onImported?.();
    setNote('A forgalmi csomag aktiválva. '+d.rows+' cégösszesítés él, '+d.superseded+' korábbi csomag lecserélve.');
    setParsed(null);setPreview(null);setFile(null);setRevision('');setLocalNote('');setConfirmed(false);if(fileRef.current)fileRef.current.value='';setRefreshKey(k=>k+1);
@@ -58,7 +58,7 @@ export default function HqVectoryImport({boot,setNote,setError,onImported}){
   catch(e){setLocalError(e.message)}finally{setBusy('')}};
 
  const restore=async id=>{if(!confirm('Visszaállítod ezt a korábbi forgalmi csomagot aktív adatkészletként?'))return;setBusy('restore');
-  try{await api('trafficRestore',{id,reason:'Korábbi csomag visszaállítása'});setNote('A korábbi forgalmi csomag ismét aktív.');setRefreshKey(k=>k+1)}
+  try{await api('trafficRestore',{id,reason:'Korábbi csomag visszaállítása'});await onImported?.();setNote('A korábbi forgalmi csomag és a kimutatások visszaállítva. A napi munka és az ügyek megmaradtak.');setRefreshKey(k=>k+1)}
   catch(e){setLocalError(e.message)}finally{setBusy('')}};
 
  return <>
@@ -101,25 +101,25 @@ export default function HqVectoryImport({boot,setNote,setError,onImported}){
    <div><h3 className="text-sm font-semibold">Legnagyobb elmozdulások</h3>{!(preview.movers.up.length||preview.movers.down.length)&&<p className="hq-hint">Nincs összehasonlítható lezárt hónap.</p>}
     <ul className="mt-1 space-y-1 text-xs">{[...preview.movers.up.map(x=>({...x,dir:'+'})),...preview.movers.down.map(x=>({...x,dir:''}))].slice(0,10).map(x=><li key={x.company_key+x.month} className="flex justify-between gap-2 border-b border-border/60 pb-1"><span>{x.company} <small className="text-muted-foreground">({x.month})</small></span><b>{x.dir}{fmt(x.delta/1000,2)} t</b></li>)}</ul></div>
   </div>
-  {!!preview.newCompanies.length&&<div className="hq-import-preview"><h3>Ismeretlen cégek a cégtörzsben ({preview.newCompanies.length})</h3><p>Az import nem hoz létre cégtörzs-rekordot. Ha kell, a Cégtörzsben vedd fel őket.</p><ul>{preview.newCompanies.slice(0,10).map(n=><li key={n.company}>{n.company} · {T(n.kg)}</li>)}</ul></div>}
+  {!!preview.newCompanies.length&&<div className="hq-import-preview"><h3>Ismeretlen cégek a cégtörzsben ({preview.newCompanies.length})</h3><p>Jóváhagyáskor a valid Vectory-lista cégeit felvesszük a cégtörzsbe. A meglévő cégekhez tartozó ügyek és jegyzetek megmaradnak.</p><ul>{preview.newCompanies.slice(0,10).map(n=><li key={n.company}>{n.company} · {T(n.kg)}</li>)}</ul></div>}
   {!!preview.mismatch.length&&<div className="hq-import-preview"><h3>Eltérő írásmód ({preview.mismatch.length})</h3><ul>{preview.mismatch.slice(0,10).map((m,i)=><li key={i}>{m.staged} → cégtörzs: {m.master}</li>)}</ul></div>}
   {!!(preview.issues||[]).length&&<ul className="hq-hint">{preview.issues.map((i,ix)=><li key={ix}><AlertTriangle size={12}/> {i.text||i}</li>)}</ul>}
   <div className="hq-grid">
-   <label className="hq-field"><span>Pénznem a forrásfájlban</span><input value={currency} maxLength={8} onChange={e=>setCurrency(e.target.value)}/></label>
+   <label className="hq-field"><span>A nettó érték pénzneme (ha ismert)</span><input value={currency} maxLength={8} onChange={e=>setCurrency(e.target.value)}/></label>
    <label className="hq-field"><span>Jóváhagyási megjegyzés</span><input value={note} maxLength={400} onChange={e=>setLocalNote(e.target.value)}/></label>
-   <label className="hq-field"><span>Megerősítés</span><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/> A pénznem és a záródátum rendben van</label></label>
+   <label className="hq-field"><span>Megerősítés</span><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/> Az időszak teljes listája, az összesítés rendben van</label></label>
   </div>
   <div className="hq-actions">
    <Button className="hq-primary" disabled={!!busy||!confirmed} onClick={approve}><ShieldCheck size={14}/> {busy==='approve'?'Aktiválás…':'Jóváhagyás és aktiválás'}</Button>
    <Button variant="outline" disabled={!!busy} onClick={discard}><Trash2 size={14}/> Feltöltés visszavonása</Button>
   </div>
-  {!confirmed&&<p className="hq-hint">Jóváhagyás csak a pénznem és a záródátum megerősítése után lehetséges. Az aktiválás a korábbi csomagot lecseréli, de nem törli.</p>}
+  {!confirmed&&<p className="hq-hint">A partner pénzneme önmagában nem igazolja a nettó érték pénznemét. Ismeretlen pénznemnél a forgalom tonnában használható. Az aktiválás a korábbi csomagot lecseréli, de nem törli.</p>}
  </section>}
 
  <section className="hq-card">
   <div className="hq-sectionhead"><h2>Forgalmi csomagok</h2><button className="hq-btn" disabled={!!busy} onClick={()=>setRefreshKey(k=>k+1)}><RefreshCw size={14}/> Frissítés</button></div>
   <div className="hq-tablewrap"><table className="hq-table"><thead><tr><th>Csomag</th><th>Időszak</th><th>Állapot</th><th className="num">Ért. t</th><th className="num">Beszerzés t</th><th>Feltöltve</th><th>Jóváhagyta</th><th/></tr></thead><tbody>
-   {packages.map(p=><tr key={p.id}><td>{p.label||p.filename}<div className="text-xs text-muted-foreground">{p.filename}</div></td><td>{p.period_from} – {p.period_to}</td><td>{STATUS[p.status]||p.status}{p.currency_confirmed?'':p.currency?' · pénznem nincs megerősítve':''}</td><td className="num">{fmt(p.kg_sales/1000,2)}</td><td className="num">{fmt(p.kg_purchase/1000,2)}</td><td>{p.uploaded_at?new Date(p.uploaded_at).toLocaleDateString('hu-HU'):''}<div className="text-xs text-muted-foreground">{p.uploaded_by}</div></td><td>{p.approved_at?new Date(p.approved_at).toLocaleDateString('hu-HU'):'–'}<div className="text-xs text-muted-foreground">{p.approved_by}</div></td><td>{p.status!=='active'&&p.status!=='withdrawn'&&<Button variant="outline" disabled={!!busy} onClick={()=>restore(p.id)}><RotateCcw size={13}/> Visszaállítás</Button>}</td></tr>)}
+   {packages.map(p=><tr key={p.id}><td>{p.label||p.filename}<div className="text-xs text-muted-foreground">{p.filename}</div></td><td>{p.period_from} – {p.period_to}</td><td>{STATUS[p.status]||p.status}{p.currency_confirmed?'':p.currency?' · pénznem nincs megerősítve':''}</td><td className="num">{fmt(p.kg_sales/1000,2)}</td><td className="num">{fmt(p.kg_purchase/1000,2)}</td><td>{p.uploaded_at?new Date(p.uploaded_at).toLocaleDateString('hu-HU'):''}<div className="text-xs text-muted-foreground">{p.uploaded_by}</div></td><td>{p.approved_at?new Date(p.approved_at).toLocaleDateString('hu-HU'):'–'}<div className="text-xs text-muted-foreground">{p.approved_by}</div></td><td>{p.status==='superseded'&&<Button variant="outline" disabled={!!busy} onClick={()=>restore(p.id)}><RotateCcw size={13}/> Visszaállítás</Button>}</td></tr>)}
   </tbody></table></div>
   {!packages.length&&<p className="hq-empty">Még nincs feltöltött forgalmi csomag.</p>}
   <p className="hq-hint">Az aktív csomag adja a javaslatok forgalmi hivatkozásait. A záródátumon túli hónapokra a rendszer nem állít semmit.</p>
