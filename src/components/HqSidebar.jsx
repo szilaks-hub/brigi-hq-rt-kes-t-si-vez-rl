@@ -4,14 +4,14 @@ import {ChevronDown,LogOut,X} from 'lucide-react';
 export default function HqSidebar({sections=[],view,onGo,onLogout,boot,open,onClose}){
  const activeSection=sections.find(s=>s.items.some(([k])=>k===view))?.key||sections[0]?.key;
  const [expanded,setExpanded]=useState([]);
- useEffect(()=>{if(activeSection)setExpanded(e=>e.includes(activeSection)?e:[...e,activeSection])},[activeSection]);
- const toggle=k=>setExpanded(e=>e.includes(k)?e.filter(x=>x!==k):[...e,k]);
+ useEffect(()=>{if(activeSection)setExpanded([activeSection])},[activeSection]);
+ const toggle=k=>setExpanded(e=>e.includes(k)?[]:[k]);
  const go=k=>{onGo(k);onClose?.()};
  return <>
   {open&&<div className="hq-side-scrim" onClick={onClose}/>}
   <aside className={'hq-side'+(open?' open':'')} aria-label="Főmenü">
    <div className="hq-side-brand">
-    <img src="/brigi-logo.png" alt="BRIGI HQ" className="hq-side-logo"/>
+    <img src="https://media.base44.com/images/public/6ad9a93f34c02a6be8e504f1/42e6f23c2_image_8_.png" alt="BRIGI HQ" className="hq-side-logo"/>
     <div><b>BRIGI HQ</b><span>Értékesítési vezérlő</span></div>
     <button className="hq-side-close" onClick={onClose} aria-label="Menü bezárása"><X size={16}/></button>
    </div>
