@@ -1,0 +1,7 @@
+import React,{useEffect,useState} from 'react';
+import {base44} from '@/api/base44Client';
+export default function HqWorkSummary({onGo,onStart}){
+ const [d,setD]=useState(null),[suggestions,setSuggestions]=useState([]),[error,setError]=useState('');
+ useEffect(()=>{let live=true;Promise.all([base44.functions.invoke('hq-api',{action:'taskFlow'}),base44.functions.invoke('hq-api',{action:'suggestions',limit:3})]).then(([a,b])=>{if(live){if(a.data.error||b.data.error)throw Error(a.data.error||b.data.error);setD(a.data.summary);setSuggestions(b.data.items||[])}}).catch(e=>{if(live)setError(e.message)});return()=>{live=false}},[]);
+ return <div className="hq-work-summary"><div className="hq-work-shortcuts"><button onClick={()=>onGo('daily')}>+ Hívás rögzítése</button>{[['Nyitott ügy','open'],['Lejárt','overdue'],['Sikeres','won'],['Sikertelen','lost']].map(([l,k])=><button key={k} onClick={()=>onGo('cases')}><b>{d?d[k]:'…'}</b> {l}</button>)}</div>{suggestions.length>0&&<div className="hq-call-suggestions"><span>Kit hívjunk?</span>{suggestions.map(s=><button key={s.company_id+s.reason} onClick={()=>onStart(s)} title={s.detail}>{s.company}<small>{s.reason}</small></button>)}</div>}{error&&<p role="alert">{error}</p>}</div>;
+}
