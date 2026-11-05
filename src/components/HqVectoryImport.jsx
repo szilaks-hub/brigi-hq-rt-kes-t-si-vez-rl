@@ -9,7 +9,7 @@ const fmt=(n,d=1)=>n==null||!Number.isFinite(Number(n))?'–':Number(n).toLocale
 const T=(kg)=>fmt(Number(kg||0)/1000,2)+' t';
 const STATUS={staged:'Előkészítve',active:'Aktív adatkészlet',superseded:'Lecserélve',withdrawn:'Visszavonva'};
 
-export default function HqVectoryImport({boot,setNote,setError}){
+export default function HqVectoryImport({boot,setNote,setError,onImported}){
  const [file,setFile]=useState(null),[parsed,setParsed]=useState(null),[progress,setProgress]=useState(''),[busy,setBusy]=useState(''),[localError,setLocalError]=useState('');
  const [revision,setRevision]=useState(''),[preview,setPreview]=useState(null),[currency,setCurrency]=useState('HUF'),[confirmed,setConfirmed]=useState(false),[note,setLocalNote]=useState('');
  const [packages,setPackages]=useState([]),[active,setActive]=useState(null),[refreshKey,setRefreshKey]=useState(0);
@@ -27,8 +27,19 @@ export default function HqVectoryImport({boot,setNote,setError}){
   try{
    setProgress('A nyers fájl privát mentése…');
    const up=await base44.integrations.Core.UploadPrivateFile({file});
-   const rows=[];for(const sheet of parsed.sheets)for(const a of sheet.aggregates)rows.push({company:a.company,kind:sheet.kind,kg:a.kg,net:a.net||0,rows:a.rows,first_date:a.first_date,last_date:a.last_date,months:a.months});
-   const meta={label:parsed.fileName+' · '+parsed.periodFrom+' – '+parsed.periodTo,file_name:parsed.fileName,file_uri:up?.file_uri||'',file_size:parsed.fileSize,fingerprint:parsed.hash,currency,period_from:parsed.periodFrom,period_to:parsed.periodTo,scope:parsed.sheets.some(s=>s.kind==='purchase')?'full':'partial',processed:parsed.sheets.reduce((n,s)=>n+s.stats.processed,0),zero:parsed.sheets.reduce((n,s)=>n+s.stats.zero,0),negative:parsed.sheets.reduce((n,s)=>n+s.stats.negative,0),undated:parsed.sheets.reduce((n,s)=>n+s.stats.undated,0),issues:[...(parsed.issues||[]),...parsed.sheets.filter(s=>s.ambiguity).map(s=>s.sheet+': '+s.ambiguity)].slice(0,20)};
+   setProgress('Közös kimutatások frissítésének előkészítése…');
+   const current=await api('report');
+   const state=JSON.parse(await new Response(new Blob([Uint8Array.from(atob(current.payload),c=>c.charCodeAt(0))]).stream().pipeThrough(new DecompressionStream('gzip'))).text());
+   for(const p of state.parts)p.rows=p.rows.filter(r=>!r.__hqLiveId);
+   const incoming=new Map();
+   for(const sheet of parsed.sheets)for(const r of sheet.reportRows){const k=sheet.kind+':'+r.p;if(!incoming.has(k))incoming.set(k,{key:k,kind:sheet.kind,period:r.p,source:parsed.fileName,hash:parsed.hash,rows:[],issues:[]});incoming.get(k).rows.push(r)}
+   state.parts=state.parts.filter(p=>!incoming.has(p.key)).concat([...incoming.values()]);
+   state.settings.money='unknown';
+   const compressed=new Uint8Array(await new Response(new Blob([JSON.stringify(state)]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer());let binary='';for(let i=0;i<compressed.length;i+=8192)binary+=String.fromCharCode(...compressed.slice(i,i+8192));const payload=btoa(binary),chunks=Math.ceil(payload.length/8000);
+   for(let i=0;i<chunks;i+=20){setProgress('Riportok előkészítése: '+Math.min(i+20,chunks)+' / '+chunks);await api('stageChunks',{revision:rev,chunks:Array.from({length:Math.min(20,chunks-i)},(_,j)=>({chunk_index:i+j,payload:payload.slice((i+j)*8000,(i+j+1)*8000)}))})}
+   const rows=[];for(const sheet of parsed.sheets)for(const a of sheet.aggregates)rows.push({company:a.company,company_meta:sheet.companies.find(c=>c.name===a.company)||{},kind:sheet.kind,kg:a.kg,net:a.net||0,rows:a.rows,first_date:a.first_date,last_date:a.last_date,months:a.months});
+
+   const meta={report_revision:rev,report_chunk_count:chunks,expected_report_revision:current.manifest?.revision||'',label:parsed.fileName+' · '+parsed.periodFrom+' – '+parsed.periodTo,file_name:parsed.fileName,file_uri:up?.file_uri||'',file_size:parsed.fileSize,fingerprint:parsed.hash,currency,period_from:parsed.periodFrom,period_to:parsed.periodTo,scope:'full',processed:parsed.sheets.reduce((n,s)=>n+s.stats.processed,0),zero:parsed.sheets.reduce((n,s)=>n+s.stats.zero,0),negative:parsed.sheets.reduce((n,s)=>n+s.stats.negative,0),undated:parsed.sheets.reduce((n,s)=>n+s.stats.undated,0),issues:[...(parsed.issues||[]),...parsed.sheets.filter(s=>s.ambiguity).map(s=>s.sheet+': '+s.ambiguity)].slice(0,20)};
    for(let i=0;i<rows.length;i+=200){setProgress('Feldolgozás: '+Math.min(i+200,rows.length)+' / '+rows.length+' cég');await api('trafficStage',{revision:rev,meta:i===0?meta:{},rows:rows.slice(i,i+200)})}
    setProgress('Ellenőrző összesítés…');
    const d=await api('trafficPreview',{revision:rev});setPreview(d.preview);setCurrency(d.preview.currency||currency);setNote('A forgalmi csomag előkészítve. Ellenőrizd az összesítést, utána hagyd jóvá.');
@@ -36,7 +47,8 @@ export default function HqVectoryImport({boot,setNote,setError}){
   }catch(e){setLocalError(e.message);setError(e.message)}finally{setBusy('');setProgress('')}};
 
  const approve=async()=>{setBusy('approve');setLocalError('');
-  try{const d=await api('trafficApprove',{revision,currency,currency_confirmed:confirmed,note:setLocalNote||''});
+  try{const d=await api('trafficApprove',{revision,currency,currency_confirmed:confirmed,note});
+   await onImported?.();
    setNote('A forgalmi csomag aktiválva. '+d.rows+' cégösszesítés él, '+d.superseded+' korábbi csomag lecserélve.');
    setParsed(null);setPreview(null);setFile(null);setRevision('');setLocalNote('');setConfirmed(false);if(fileRef.current)fileRef.current.value='';setRefreshKey(k=>k+1);
   }catch(e){setLocalError(e.message)}finally{setBusy('')}};
@@ -54,13 +66,13 @@ export default function HqVectoryImport({boot,setNote,setError}){
   <div className="hq-orbit"><b>{active?T(active.kg_sales||0):'–'}</b><span>{active?'aktív értékesítés · záródátum '+active.period_to:'nincs jóváhagyott adat'}</span></div></section>
 
  <section className="hq-card">
-  <div className="hq-sectionhead"><h2>Havi vagy heti export feltöltése</h2><span>{active?'Aktív: '+(active.label||'')+' · '+active.period_from+' – '+active.period_to:'Még nincs jóváhagyott forgalmi adat'}</span></div>
+  <div className="hq-sectionhead"><h2>Heti frissítés a teljes Vectory-listából</h2><span>{active?'Aktív: '+(active.label||'')+' · '+active.period_from+' – '+active.period_to:'Még nincs jóváhagyott forgalmi adat'}</span></div>
   <div className="hq-controls">
    <label className="hq-btn"><Upload size={14}/> Fájl kiválasztása<input ref={fileRef} type="file" accept=".xlsx,.csv" hidden disabled={!!busy} onChange={e=>pick(e.target.files[0])}/></label>
    <span className="hq-pill">{busy==='parse'?(progress||'Beolvasás…'):file?file.name:'Nincs kiválasztott fájl'}</span>
    {!!parsed&&!preview&&<Button className="hq-primary" disabled={!!busy} onClick={stage}>{busy==='stage'?(progress||'Előkészítés…'):'Előkészítés ellenőrzésre'}</Button>}
   </div>
-  <p className="hq-hint">Az azonosítás a fájl tartalma alapján történik (SHA-256). Ugyanaz a fájl nem kerül be kétszer. Ha a lap fejléce nem ismerhető fel, a rendszer nem dolgoz fel semmit.</p>
+  <p className="hq-hint">Hetente a teljes, év elejétől vezetett listát töltsd fel, a csatolt mintához hasonlóan. Az érintett hónapok adatait lecseréljük, így nincs dupla forgalom. A cégek azonosítója, jegyzetei és ügyei megmaradnak. Csak egyetlen hetet tartalmazó részlista itt nem használható.</p>
   {(localError||progress&&busy==='stage')&&<p className="hq-hint">{localError||progress}</p>}
  </section>
 
@@ -79,7 +91,7 @@ export default function HqVectoryImport({boot,setNote,setError}){
   <div className="hq-stats">
    <div className="hq-stat"><span>Értékesítés</span><strong>{T(preview.sales.kg)}<small>{fmt(preview.sales.companies,0)} cég</small></strong></div>
    <div className="hq-stat"><span>Beszerzés</span><strong>{T(preview.purchase.kg)}<small>{fmt(preview.purchase.companies,0)} cég</small></strong></div>
-   <div className="hq-stat"><span>Nulla súlyú sor</span><strong>{fmt(preview.zero,0)}<small>kihagyva</small></strong></div>
+   <div className="hq-stat"><span>Nulla súlyú sor</span><strong>{fmt(preview.zero,0)}<small>tonnában 0, az érték megmarad</small></strong></div>
    <div className="hq-stat"><span>Negatív súly</span><strong>{fmt(preview.negative,0)}<small>stornó</small></strong></div>
    <div className="hq-stat"><span>Dátum nélkül</span><strong>{fmt(preview.undated,0)}<small>kimutatásban nem szerepel</small></strong></div>
   </div>
