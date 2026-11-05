@@ -18,7 +18,7 @@ export default function HqSidebar({sections=[],view,onGo,onLogout,boot,open,onCl
    <nav className="hq-side-nav">
     {sections.map(s=>{const Icon=s.icon,single=s.items.length===1,isOpen=expanded.includes(s.key),isActive=activeSection===s.key;
      return <div key={s.key} className={'hq-side-group'+(isActive?' active':'')}>
-      <button className="hq-side-head" onClick={()=>single?go(s.items[0][0]):toggle(s.key)} aria-expanded={single?undefined:isOpen}>
+      <button className="hq-side-head" onClick={()=>single?go(s.items[0][0]):toggle(s.key)} aria-expanded={single?undefined:isOpen} aria-current={single&&isActive?'page':undefined}>
        <Icon size={16}/><span>{s.title}</span>{!single&&<ChevronDown size={14} className={isOpen?'rot':''}/>}
       </button>
       {!single&&isOpen&&<div className="hq-side-items">{s.items.map(([k,label,ItemIcon])=>
