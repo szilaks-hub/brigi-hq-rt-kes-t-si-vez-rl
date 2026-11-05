@@ -2,7 +2,7 @@ import React,{useState} from 'react';
 import {Button} from '@/components/ui/button';
 import {AlarmClock,ArrowRight,ThumbsDown} from 'lucide-react';
 
-const T=kg=>Number(kg||0).toLocaleString('hu-HU',{maximumFractionDigits:2})+' t';
+const T=kg=>(Number(kg||0)/1000).toLocaleString('hu-HU',{maximumFractionDigits:2})+' t';
 
 export default function HqSuggestions({data,loading,onPick,onSignal,onMore,busy}){
  const items=data?.items||[],total=data?.total||0,coverage=data?.coverage;
