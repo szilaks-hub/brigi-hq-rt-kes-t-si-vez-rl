@@ -6,18 +6,19 @@ export const KIND_LABEL={sales:'Értékesítés',purchase:'Beszerzés'};
 const KIND_HINTS={sales:['ertekesites','eladas','sales','vevo'],purchase:['beszerzes','purchase','szallito']};
 const FIELDS={
  company:['ugyf hosszu nev','ugyfel hosszu nev','ugyfeltorzs','ugyfel','cegnev','ceg','vevo','partner nev','partner','name'],
- date:['teljesites datuma','bizonylat datuma','szamla datuma','datum','kelt','teljesites'],
- kg:['szum suly','suly kg','suly','nettosuly','nettos suly'],
+ date:['forg kelte','kelte','teljesites datuma','bizonylat datuma','szamla datuma','datum','kelt','teljesites'],
+ kg:['szum','szum suly','suly kg','suly','nettosuly','nettos suly'],
  net:['forg netto ert','forg netto ertek','forgnettoert','netto ert','netto ertek','forgalmi netto'],
- qty:['mennyiseg','darab','db','menny'],
- unitWeight:['egysegsuly','egyseg suly','suly db'],
- orderAdmin:['rendelesi ugyintezo','ugyintezo','rendelesiugyintezo','rendelo'],
- owner:['ugyf felelos','ugyfel felelos','felelos ugyintezo','felelos'],
- group:['ertekesitesi csoport','csoport','csapat'],
- status:['szamla allapota','szamla statusza','statusz','allapot'],
- currency:['penznem','deviza','currency'],
+ qty:['forg mennyiseg','mennyiseg','darab','db','menny'],
+ unitWeight:['cikk brutto kg','egysegsuly','egyseg suly','suly db'],
+ orderAdmin:['forg sajat ugyintezo rendelesen','rendelesi ugyintezo','ugyintezo','rendelesiugyintezo','rendelo'],
+ owner:['ugyf felelos ugyintezo','ugyf felelos','ugyfel felelos','felelos ugyintezo','felelos'],
+ group:['csapat','ertekesitesi csoport','csoport','csapat'],
+ status:['forg allapot','szamla allapota','szamla statusza','statusz','allapot'],
+ currency:['ugyf penznem','penznem','deviza','currency'],
  city:['ugyf varos','varos','telepules'],
- product:['cikkcsoport','termekcsoport','termek','cikk']
+ product:['cikk cikknev','cikknev','termek','cikk'],
+ category:['cikk cikkcsoport2','cikkcsoport','termekcsoport'], country:['ugyf orszag','orszag'],shipping:['forg szallitasi mod','szallitasi mod'],warehouse:['forg raktar','raktar'],days:['ugyf haladek','haladek'],movement:['forg mozgasnem','mozgasnem']
 };
 const REQUIRED=['company','date','kg'];
 export const norm=s=>String(s??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[.:()_\/\\-]+/g,' ').replace(/\s+/g,' ').trim();
@@ -105,10 +106,14 @@ function normalizeSheet(rows,kind,meta){
   const kg=num(row[map.kg]);
   if(kg===null)continue;
   const d=excelDate(row[map.date]);
-  out.push({company,key:norm(company),kg,net:map.net!==undefined?num(row[map.net]):null,date:d.date,month:d.month,precision:d.precision,status:map.status!==undefined?String(row[map.status]??'').trim():'',city:map.city!==undefined?String(row[map.city]??'').trim():'',owner:map.owner!==undefined?String(row[map.owner]??'').trim():'',orderAdmin:map.orderAdmin!==undefined?String(row[map.orderAdmin]??'').trim():'',group:map.group!==undefined?String(row[map.group]??'').trim():'',currency:map.currency!==undefined?String(row[map.currency]??'').trim():'',product:map.product!==undefined?String(row[map.product]??'').trim():'',qty:map.qty!==undefined?num(row[map.qty]):null,unitWeight:map.unitWeight!==undefined?num(row[map.unitWeight]):null});
+  if(!d.month)throw Error(meta+' '+(i+1)+'. sor: hiányzó vagy érvénytelen dátum.');
+  const value=k=>map[k]!==undefined?String(row[map[k]]??'').trim():'';
+  out.push({country:value('country'),category:value('category').split(' / ')[0]||'Egyéb / szolgáltatás',shipping:value('shipping'),warehouse:value('warehouse'),days:num(value('days')),movement:value('movement'),ref:meta+'!'+(i+1),company,key:norm(company),kg,net:map.net!==undefined?num(row[map.net]):null,date:d.date,month:d.month,precision:d.precision,status:map.status!==undefined?String(row[map.status]??'').trim():'',city:map.city!==undefined?String(row[map.city]??'').trim():'',owner:map.owner!==undefined?String(row[map.owner]??'').trim():'',orderAdmin:map.orderAdmin!==undefined?String(row[map.orderAdmin]??'').trim():'',group:map.group!==undefined?String(row[map.group]??'').trim():'',currency:map.currency!==undefined?String(row[map.currency]??'').trim():'',product:map.product!==undefined?String(row[map.product]??'').trim():'',qty:map.qty!==undefined?num(row[map.qty]):null,unitWeight:map.unitWeight!==undefined?num(row[map.unitWeight]):null});
  }
  const built=aggregate(out);
- return{kind,sheet:meta,headers:(rows[header.index]||[]).map((x,i)=>`${i+1}: ${String(x??'').trim()}`).filter(x=>x.length>3),ambiguity:issue,...built};
+ const companyMap=new Map();for(const r of out){const c=companyMap.get(r.key)||{name:r.company,owners:[],teams:[],countries:[],types:[]};for(const [field,value] of [['owners',r.owner],['teams',r.group],['countries',r.country],['types',kind==='sales'?'vevő':'szállító']])if(value&&!c[field].includes(value))c[field].push(value);companyMap.set(r.key,c)}
+ const reportRows=out.map(r=>({p:r.month,date:r.date,kg:r.kg,value:r.net,employee:r.orderAdmin,owner:r.owner,company:r.company,country:r.country||'Nincs megadva',currency:/^(ft|huf)$/i.test(r.currency)?'HUF':r.currency||'Ismeretlen',shipping:r.shipping||'Nincs megadva',product:r.product||'Nincs megadva',category:r.category,team:r.group||'Nincs megadva',days:r.days,warehouse:r.warehouse||'Nincs megadva',status:r.status||'Nincs megadva',ref:r.ref}));
+ return{kind,sheet:meta,reportRows,companies:[...companyMap.values()],headers:(rows[header.index]||[]).map((x,i)=>`${i+1}: ${String(x??'').trim()}`).filter(x=>x.length>3),ambiguity:issue,...built};
 }
 export async function fingerprintFile(file){
  const buf=await file.arrayBuffer();
@@ -126,7 +131,7 @@ export async function parseTrafficFile(file,onProgress=()=>{}){
   if(!kind){issues.push(`„${name}”: a munkalap nem azonosítható értékesítési vagy beszerzési lapként.`);continue}
   if(!rows.length){issues.push(`„${name}”: üres munkalap.`);continue}
   onProgress(`„${name}” feldolgozása…`);
-  try{parsed.push(normalizeSheet(rows,kind,name))}catch(e){issues.push(`${e.message}`)}
+  parsed.push(normalizeSheet(rows,kind,name));
  }
  if(!parsed.length)throw Error(issues.join(' ')||'A fájlban nem található feldolgozható munkalap.');
  return{hash,fileName:file.name,fileSize:file.size,sheets:parsed,issues,periodFrom:parsed.map(s=>s.aggregates.map(a=>a.first_date)).flat().filter(Boolean).sort()[0]||'',periodTo:parsed.map(s=>s.aggregates.map(a=>a.last_date)).flat().filter(Boolean).sort().pop()||''};
