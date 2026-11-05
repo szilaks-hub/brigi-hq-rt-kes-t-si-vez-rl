@@ -603,10 +603,17 @@ Deno.serve(async(req)=>{try{
  for(const d of dayRows){if(clean(d.status)!=='closed')continue;if(!scopeAll&&d.employee!==employee)continue;const dd=String(d.date||'');if((from&&dd<from)||(to&&dd>to))continue;bucket(d.employee).closedDays++}
  let list=[...map.values()].filter((e:any)=>scopeAll||e.employee===employee);
  if(wanted)list=list.filter((e:any)=>e.team===wanted);
+ const scopedRows=wanted?rows.filter((r:any)=>memberTeam.get(key(r.employee))===wanted):rows;
+ const trendMap=new Map<string,any>();
+ for(const r of scopedRows){const m=String(r.date||'').slice(0,7);if(!m)continue;if(!trendMap.has(m))trendMap.set(m,{month:m,activities:0,points:0,pending:0,order_t:0,quote_t:0});const t=trendMap.get(m);t.activities++;if(r.points===null||r.points===undefined)t.pending++;else t.points+=num0(r.points);t.order_t+=num0(r.order_t);t.quote_t+=num0(r.quote_t)}
+ const trend=[...trendMap.values()].map((t:any)=>({...t,points:Math.round(t.points*100)/100,order_t:Math.round(t.order_t*100)/100,quote_t:Math.round(t.quote_t*100)/100})).sort((a:any,b:any)=>a.month.localeCompare(b.month)).slice(-12);
+ const compMap=new Map<string,any>();
+ for(const r of scopedRows){const k=key(r.company);if(!k)continue;if(!compMap.has(k))compMap.set(k,{company:clean(r.company),activities:0,points:0,order_t:0,quote_t:0});const c=compMap.get(k);c.activities++;if(r.points!==null&&r.points!==undefined)c.points+=num0(r.points);c.order_t+=num0(r.order_t);c.quote_t+=num0(r.quote_t)}
+ const topCompanies=[...compMap.values()].map((c:any)=>({...c,points:Math.round(c.points*100)/100,order_t:Math.round(c.order_t*100)/100})).sort((a:any,b:any)=>b.order_t-a.order_t||b.points-a.points||b.activities-a.activities).slice(0,10);
  list=list.map((e:any)=>({...e,points:Math.round(e.points*100)/100,order_t:Math.round(e.order_t*1000)/1000,quote_t:Math.round(e.quote_t*1000)/1000,bend_t:Math.round(e.bend_t*1000)/1000})).sort((a:any,b:any)=>b.points-a.points||b.order_t-a.order_t||a.employee.localeCompare(b.employee,'hu'));
  const totals=list.reduce((o:any,e:any)=>{for(const k of ['activities','points','order_t','quote_t','bend_t','orders','offers','openTasks','overdue','closedDays','pending'])o[k]+=e[k];return o},{activities:0,points:0,order_t:0,quote_t:0,bend_t:0,orders:0,offers:0,openTasks:0,overdue:0,closedDays:0,pending:0});
  totals.people=list.length;totals.avgPoints=list.length?Math.round(totals.points/list.length*100)/100:0;
- return Response.json({from,to,team:wanted,teams,today:day0,scope:scopeAll?'mind':'saját',employees:list,totals});
+ return Response.json({from,to,team:wanted,teams,today:day0,scope:scopeAll?'mind':'saját',employees:list,totals,trend,topCompanies});
  }
  fail('Ismeretlen művelet.');
  }catch(e){return Response.json({error:e.message||'Hiba történt.'},{status:e.status||500})}});
