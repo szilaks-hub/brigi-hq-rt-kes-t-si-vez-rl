@@ -85,7 +85,7 @@ function Daily({boot,run,setNote,setError,openDocuments,onDailyChange,prefill,st
  const peopleOfTeam=t=>t?allPeople.filter(p=>boot.members.some(m=>m.team===t&&m.employee===p)):allPeople;
  const people=peopleOfTeam(teamFilter);
  const load=async()=>{setLoading(true);try{const d=await call('getDay',{date,employee:person});setDay(d);setTasks(d.tasks||[]);setTeamTasks(d.teamTasks||[])}catch(e){setError(e.message)}finally{setLoading(false);firstLoaded.current=true}};
- useEffect(()=>{setEdit(null);load()},[date,person]);
+ useEffect(()=>{load()},[date,person]);
  const autoSheet=useRef(false),autoEdit=useRef(false),firstLoaded=useRef(false),editorRef=useRef(null);
  useEffect(()=>{
   if(loading||!firstLoaded.current||date!==boot.today||!day)return;
