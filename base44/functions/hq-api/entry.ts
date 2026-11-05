@@ -150,8 +150,10 @@ Deno.serve(async(req)=>{try{
    if(!linked)linked=await E.HQTask.create({employee:person,owner_email:email,company_id:company.id,company:company.name,note:clean(data.next_step||data.note||data.action).slice(0,2000),due_date:data.next_due||day,status:'open',outcome:'',closed_date:'',archived:false,suspended:false,task_type:data.action==='Ajánlat'?'ajanlat_utani':'megkereses',priority:'kozepes',next_step:data.next_step,origin:'Napi jelentés · '+day,origin_key:originKey,postpone_count:0,reminder_count:0});
   }
   data.task_id=linked.id;
+  if(previous)data.parent_activity_id=previous.parent_activity_id||'';
+  else if(!data.parent_activity_id)data.parent_activity_id=linked.last_activity_id||'';
   const row=previous?await E.HQActivity.update(previous.id,data):await E.HQActivity.create(data);
-  if(linked.status!=='done'&&(data.next_step||data.next_due))await E.HQTask.update(linked.id,{...(data.next_due?{due_date:data.next_due}:{}),...(data.next_step?{next_step:data.next_step}:{}),last_activity_id:row.id});
+  if(linked.status!=='done')await E.HQTask.update(linked.id,{...(data.next_due?{due_date:data.next_due}:{}),...(data.next_step?{next_step:data.next_step}:{}),last_activity_id:row.id});
 
   await audit(E,user,{action:previous?'napi sor módosítása':'napi sor rögzítése',target_kind:'hqactivity',target_id:row.id,target_label:company.name+' · '+day+' · '+data.action,after:{order_t:row.order_t,quote_t:row.quote_t,bend_t:row.bend_t,bucket:row.bucket,points:row.points,rule_label:row.rule_label}});
   return Response.json({row});
