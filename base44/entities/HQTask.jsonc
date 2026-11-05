@@ -89,6 +89,12 @@
     },
     "archived": {
       "type": "boolean"
+    },
+    "origin_key": {
+      "type": "string"
+    },
+    "last_activity_id": {
+      "type": "string"
     }
   },
   "required": [
