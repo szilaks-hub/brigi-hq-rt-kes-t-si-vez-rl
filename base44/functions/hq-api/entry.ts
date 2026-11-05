@@ -1,5 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk';
-const actions=['Megrendelés','Ajánlat','Új cég','Kivitt hajlítás'];
+const actions=['Telefonhívás','Megrendelés','Ajánlat','Új cég','Kivitt hajlítás'];
 const buckets=['0-4 t','4-8 t','8-15 t','15-24 t','24-50 t','50+ t'];
 const huCounties=['Bács-Kiskun','Baranya','Békés','Borsod-Abaúj-Zemplén','Budapest','Csongrád-Csanád','Fejér','Győr-Moson-Sopron','Hajdú-Bihar','Heves','Jász-Nagykun-Szolnok','Komárom-Esztergom','Nógrád','Pest','Somogy','Szabolcs-Szatmár-Bereg','Tolna','Vas','Veszprém','Zala','Külföld'];
 const clean=(s:any)=>String(s??'').trim();
@@ -26,7 +26,7 @@ function monthRows(sales:any[]){const map=new Map<string,any>();for(const r of s
 function moversFrom(sales:any[],complete:Set<string>,limit=8){const list:any[]=[];for(const r of sales){const months=(r.months||[]).filter((m:any)=>complete.has(m.m));if(months.length<2)continue;const last=months[months.length-1],prev=months.slice(-4,-1),avg=prev.reduce((n:number,m:any)=>n+num0(m.kg),0)/Math.max(1,prev.length),delta=num0(last.kg)-avg;if(!avg&&!delta)continue;list.push({company:r.company,company_key:r.company_key,month:last.m,kg:Math.round(num0(last.kg)*1000)/1000,base:Math.round(avg*1000)/1000,delta:Math.round(delta*1000)/1000,pct:avg?Math.round((num0(last.kg)/avg-1)*100):null})}list.sort((a,b)=>b.delta-a.delta);return{up:list.filter(x=>x.delta>0).slice(0,limit),down:list.filter(x=>x.delta<0).slice(0,limit),compared:list.length}}
 async function unzip(s:string){let data=Uint8Array.from(atob(s),c=>c.charCodeAt(0));return JSON.parse(await new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream('gzip'))).text())}
 async function zip(obj:any){let a=new Uint8Array(await new Response(new Blob([JSON.stringify(obj)]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer());let s='';for(let i=0;i<a.length;i+=8192)s+=String.fromCharCode(...a.slice(i,i+8192));return btoa(s)}
-function safeRow(r:any){let out:any={company_id:clean(r.company_id),action:clean(r.action),bucket:clean(r.bucket),note:clean(r.note),client_key:clean(r.client_key),contact:clean(r.contact).slice(0,200),product:clean(r.product).slice(0,200),deal_ref:clean(r.deal_ref).slice(0,120),outcome:clean(r.outcome).slice(0,500),next_step:clean(r.next_step).slice(0,500),next_due:clean(r.next_due)};if(out.next_due&&!validDate(out.next_due))fail('Érvénytelen következő határidő.');if(!out.company_id)fail('Válassz céget a cégtörzsből.');if(!actions.includes(out.action))fail('Érvénytelen tevékenység.');if(out.bucket&&!buckets.includes(out.bucket))fail('Érvénytelen tonnasáv.');if(out.note.length>10000)fail('A megjegyzés legfeljebb 10000 karakter lehet.');for(let k of ['order_t','quote_t','bend_t']){let v=r[k];out[k]=(v===null||v===undefined||v==='')?null:Number(v);if(out[k]!==null&&(!Number.isFinite(out[k])||out[k]<0))fail('A tonnaérték nem lehet negatív.')}if(out.action==='Megrendelés'&&out.order_t===null)fail('A megrendelésnél add meg a rendelt tonnát.');return out}
+function safeRow(r:any){let out:any={task_id:clean(r.task_id),parent_activity_id:clean(r.parent_activity_id),company_id:clean(r.company_id),action:clean(r.action),bucket:clean(r.bucket),note:clean(r.note),client_key:clean(r.client_key),contact:clean(r.contact).slice(0,200),product:clean(r.product).slice(0,200),deal_ref:clean(r.deal_ref).slice(0,120),outcome:clean(r.outcome).slice(0,500),next_step:clean(r.next_step).slice(0,500),next_due:clean(r.next_due)};if(out.next_due&&!validDate(out.next_due))fail('Érvénytelen következő határidő.');if(!out.company_id)fail('Válassz céget a cégtörzsből.');if(!actions.includes(out.action))fail('Érvénytelen tevékenység.');if(out.bucket&&!buckets.includes(out.bucket))fail('Érvénytelen tonnasáv.');if(out.note.length>10000)fail('A megjegyzés legfeljebb 10000 karakter lehet.');for(let k of ['order_t','quote_t','bend_t']){let v=r[k];out[k]=(v===null||v===undefined||v==='')?null:Number(v);if(out[k]!==null&&(!Number.isFinite(out[k])||out[k]<0))fail('A tonnaérték nem lehet negatív.')}if(out.action==='Megrendelés'&&out.order_t===null)fail('A megrendelésnél add meg a rendelt tonnát.');return out}
 async function legacyState(E:any){
  const manifest=(await E.HQReport.filter({committed:true},'-created_date',1))[0];if(!manifest)return null;
  const chunks=(await all(E.HQChunk,{revision:manifest.revision})).sort((a:any,b:any)=>a.chunk_index-b.chunk_index);if(chunks.length!==manifest.chunk_count)fail('Hiányos mentés.');
@@ -138,9 +138,34 @@ Deno.serve(async(req)=>{try{
   else{const legacy=(await ruleList()).filter((r:any)=>r.enabled&&r.action===data.action&&(!r.bucket||r.bucket===data.bucket)&&r.effective_from<=day).sort((a:any,b:any)=>(Number(!!b.bucket)-Number(!!a.bucket))||b.effective_from.localeCompare(a.effective_from)||b.created_date.localeCompare(a.created_date))[0];if(legacy){rule_id=legacy.id;points=Number(legacy.points);rule_label='Korábbi szabály · '+legacy.action+' / '+(legacy.bucket||'minden sáv')+' / '+legacy.effective_from}}
   if(points!==null&&data.action==='Megrendelés'&&!(num0(data.order_t)>0)){points=null;rule_label='Nincs pontszám: a rendelt tonna nulla vagy negatív'}
   Object.assign(data,{date:day,employee:person,owner_email:previous?.owner_email||email,company:company.name,points,rule_id,rule_label,rule_version,rule_version_id,day_revision:sheet.revision||'',archived:false});
+  // One durable task per conversation chain. A retried save reuses its origin key.
+  let taskId=previous?.task_id||data.task_id;
+  let linked=taskId?await E.HQTask.get(taskId).catch(()=>null):null;
+  if(taskId&&(!linked||linked.company_id!==company.id||linked.employee!==person))fail('Az ügy nem ehhez a céghez és kollégához tartozik.',403);
+  if(linked?.status==='done'&&!previous)fail('Az ügy már lezárt. Indíts új ügyet.');
+  if(data.parent_activity_id){const parent=await E.HQActivity.get(data.parent_activity_id).catch(()=>null);if(!parent||parent.task_id!==taskId||parent.employee!==person||parent.company_id!==company.id)fail('Érvénytelen előzmény.',403);}
+  if(!linked){
+   const originKey='activity:'+person+':'+data.client_key;
+   linked=(await all(E.HQTask,{origin_key:originKey}))[0];
+   if(!linked)linked=await E.HQTask.create({employee:person,owner_email:email,company_id:company.id,company:company.name,note:clean(data.next_step||data.note||data.action).slice(0,2000),due_date:data.next_due||day,status:'open',outcome:'',closed_date:'',archived:false,suspended:false,task_type:data.action==='Ajánlat'?'ajanlat_utani':'megkereses',priority:'kozepes',next_step:data.next_step,origin:'Napi jelentés · '+day,origin_key:originKey,postpone_count:0,reminder_count:0});
+  }
+  data.task_id=linked.id;
   const row=previous?await E.HQActivity.update(previous.id,data):await E.HQActivity.create(data);
+  if(linked.status!=='done'&&(data.next_step||data.next_due))await E.HQTask.update(linked.id,{...(data.next_due?{due_date:data.next_due}:{}),...(data.next_step?{next_step:data.next_step}:{}),last_activity_id:row.id});
+
   await audit(E,user,{action:previous?'napi sor módosítása':'napi sor rögzítése',target_kind:'hqactivity',target_id:row.id,target_label:company.name+' · '+day+' · '+data.action,after:{order_t:row.order_t,quote_t:row.quote_t,bend_t:row.bend_t,bucket:row.bucket,points:row.points,rule_label:row.rule_label}});
   return Response.json({row});
+ }
+ if(action==='taskFlow'){
+  const person=resolveEmployee(),scopeAll=manager,rows=(await all(E.HQTask,{archived:false})).filter((t:any)=>scopeAll||t.employee===person);
+  if(body.id){
+   const task=rows.find((t:any)=>t.id===clean(body.id));if(!task)fail('Az ügy nem érhető el.',403);
+   const activities=(await all(E.HQActivity,{task_id:task.id,archived:false})).sort((a:any,b:any)=>String(a.created_date).localeCompare(String(b.created_date)));
+   const history=(await all(E.HQAudit,{target_id:task.id})).sort((a:any,b:any)=>String(a.at).localeCompare(String(b.at)));
+   return Response.json({task,activities,history});
+  }
+  const tasks=rows.sort((a:any,b:any)=>Number(a.status==='done')-Number(b.status==='done')||String(a.due_date).localeCompare(String(b.due_date)));
+  return Response.json({tasks,today:today(),summary:{open:tasks.filter((t:any)=>t.status!=='done'&&!t.suspended).length,overdue:tasks.filter((t:any)=>t.status!=='done'&&!t.suspended&&t.due_date<today()).length,won:tasks.filter((t:any)=>t.status==='done'&&t.outcome==='sikeres').length,lost:tasks.filter((t:any)=>t.status==='done'&&t.outcome==='sikertelen').length}});
  }
  if(action==='saveTask'||action==='closeTask'||action==='postponeTask'){
   const person=resolveEmployee();
@@ -160,6 +185,8 @@ Deno.serve(async(req)=>{try{
   }
   const task=await E.HQTask.get(clean(body.id)).catch(()=>null);if(!task)fail('Nincs ilyen teendő.',404);
   if(task.employee!==person)fail('Ez nem a te teendőd.',403);
+  if(task.status==='done')fail('Az ügy már lezárt.');
+  if(body.expected_updated&&body.expected_updated!==task.updated_date)fail('Az ügy időközben változott. Frissítsd a listát.',409);
   if(action==='postponeTask'){
    const due=clean(body.due_date);if(!validDate(due)||due<today())fail('Add meg az új határidőt (mai vagy későbbi nap). A rendszer nem tolja el magától a teendőt.');
    const reason=clean(body.reason);if(reason.length<3)fail('A halasztás indoklása kötelező.');
@@ -169,6 +196,12 @@ Deno.serve(async(req)=>{try{
   }
   if(!['sikeres','sikertelen'].includes(body.outcome))fail('Hibás eredmény.');
   const result=clean(body.result).slice(0,500);
+  if(body.final===true&&body.outcome==='sikertelen'){
+   if(result.length<3)fail('Írd le a sikertelen lezárás okát.');
+   const done=await E.HQTask.update(task.id,{status:'done',outcome:'sikertelen',result,closed_date:today(),suspended:false});
+   await audit(E,user,{action:'ügy sikertelen lezárása',target_kind:'hqtask',target_id:task.id,target_label:task.company,reason:result,after:{outcome:'sikertelen',result}});
+   return Response.json({task:done});
+  }
   if(clean(body.outcome)==='sikertelen'){
    const due=clean(body.due_date);if(!validDate(due)||due<today())fail('Válaszd ki a következő megkeresés napját. A rendszer nem tolja el automatikusan a teendőt.');
    const retry=await E.HQTask.update(task.id,{status:'open',outcome:'sikertelen',result,closed_date:'',previous_due:clean(task.due_date),due_date:due,postpone_reason:'sikertelen megkeresés',reminder_count:(task.reminder_count||0)+1});
