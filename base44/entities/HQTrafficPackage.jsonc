@@ -137,6 +137,15 @@
     },
     "note": {
       "type": "string"
+    },
+    "report_revision": {
+      "type": "string"
+    },
+    "report_chunk_count": {
+      "type": "number"
+    },
+    "expected_report_revision": {
+      "type": "string"
     }
   },
   "required": [
