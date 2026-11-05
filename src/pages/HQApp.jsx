@@ -28,13 +28,13 @@ import HqTeamCompare from '@/components/HqTeamCompare';
 import {LayoutDashboard,ClipboardList,Target,TrendingUp,Users,Building2,GitCompare,Globe,Package,Activity,FileText,Table2,Database,FolderOpen,SlidersHorizontal,UserCog,Award,CalendarDays,MapPin,Menu} from 'lucide-react';
 const NAV_SECTIONS=[
  {key:'home',title:'Vezérlőpult',icon:LayoutDashboard,items:[['home','Áttekintés',LayoutDashboard]]},
- {key:'work',title:'Napi munka',icon:ClipboardList,items:[['daily','Napi jelentés',ClipboardList],['cases','Ügyek és feladatok',Target],['plan','Naptár és teendők',CalendarDays],['results','Saját eredmény',Award]]},
+ {key:'work',title:'Napi munka',icon:ClipboardList,items:[['daily','Napi jelentés',ClipboardList],['cases','Ügyek és feladatok',Target],['plan','Naptár és teendők',CalendarDays],['attention','Értékesítési javaslatok',Target],['results','Saját eredmény',Award]]},
  {key:'clients',title:'Ügyfelek',icon:Building2,items:[['directory','Cégtörzs',Building2],['counties','Megyei térkép',MapPin],['documents','Dokumentumtár',FolderOpen]]},
  {key:'reports',title:'Kimutatások',icon:TrendingUp,items:[['overview','Vezetői összesítő',TrendingUp],['compare','Kolléga összehasonlítás',Users],['trends','Havi összehasonlítás',TrendingUp],['team','Csapat és kollégák',Users],['products','Termékek és beszerzés',Package],['countries','Országok',Globe],['companies','Vevőmegtartás',Building2],['activity','Napló és eredmény',Activity],['summary','DATA / Summary',Table2],['review','Értékelő készítése',Target],['ricsi','Ricsi cégleírásai',FileText],['matching','Cégegyeztetés',GitCompare]]},
  {key:'settings',title:'Beállítások',icon:SlidersHorizontal,items:[['rules','Ponttábla',SlidersHorizontal],['vectory','VECTORY forgalom',Package],['access','Hozzáférések',UserCog],['data','Adatközpont',Database]]}
 ];
 const ALL_NAV=NAV_SECTIONS.flatMap(g=>g.items),REPORT_IDS=new Set(['home','overview','attention','review','trends','team','companies','matching','countries','products','activity','ricsi','summary','data']);
-const EMPLOYEE_NAV=['home','daily','cases','plan','results','directory','documents'];
+const EMPLOYEE_NAV=['home','daily','cases','plan','attention','results','directory','documents'];
 const TITLE='BRIGI HQ - Értékesítési Vezérlő';
 const fmt=(n,d=1)=>n==null?'Nincs adat':Number(n).toLocaleString('hu-HU',{maximumFractionDigits:d});
 const norm=s=>String(s??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
