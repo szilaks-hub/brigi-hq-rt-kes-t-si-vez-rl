@@ -113,3 +113,23 @@
 .hq-unified .hq-main{padding:24px 28px 60px}
 @media(max-width:1180px){.hq-unified{grid-template-columns:232px minmax(0,1fr)}.hq-unified.is-collapsed{grid-template-columns:78px minmax(0,1fr)}}
 @media(max-width:800px){.hq-unified.is-collapsed{grid-template-columns:1fr}.hq-sidebar.is-collapsed{padding:18px 12px 14px}.hq-sidebar.is-collapsed .hq-sidebrand img{display:block;margin:0}.hq-sidebar.is-collapsed .hq-sidebrand small,.hq-sidebar.is-collapsed .hq-sidebrand>span{display:block}.hq-sidebar.is-collapsed .hq-navgroup>p{display:block}.hq-navgroup button span{display:inline}.hq-sidebar.is-collapsed .hq-navgroup button{justify-content:flex-start;padding:9px 11px}.hq-sidebar.is-collapsed .hq-sidefoot{text-align:left;align-items:stretch}.hq-sidebar.is-collapsed .hq-sidefoot button{justify-content:flex-start}}
+
+/* ===== VÉGLEGES VÁZ: flex alapú, nem csúszhat el ===== */
+.hq-app.hq-unified{display:flex;flex-direction:row;align-items:stretch;height:100dvh;overflow:hidden;background:#f4f4f8}
+.hq-unified>.hq-sidebar{position:relative;inset:auto;display:flex;flex-direction:column;flex:0 0 258px;width:258px;min-width:258px;max-width:258px;height:100dvh;padding:18px 12px 14px;overflow-y:auto;overflow-x:hidden;background:#fff;border-right:1px solid #e6e9f2;box-shadow:10px 0 30px #1b2b4a08;z-index:40}
+.hq-unified>.hq-workspace{display:flex;flex-direction:column;flex:1 1 auto;width:auto;min-width:0;height:100dvh;overflow:hidden}
+.hq-unified.is-collapsed>.hq-sidebar{flex:0 0 84px;width:84px;min-width:84px;max-width:84px}
+@media(max-width:1280px){
+ .hq-unified>.hq-sidebar{flex:0 0 236px;width:236px;min-width:236px;max-width:236px}
+ .hq-unified.is-collapsed>.hq-sidebar{flex:0 0 80px;width:80px;min-width:80px;max-width:80px}
+}
+@media(max-width:860px){
+ .hq-app.hq-unified{display:block;height:auto;min-height:100vh;overflow:visible}
+ .hq-unified>.hq-sidebar{position:fixed;top:0;bottom:0;left:-300px;flex:0 0 268px;width:268px;min-width:268px;max-width:268px;height:100dvh;transition:left .22s ease;box-shadow:0 0 60px #1b2b4a33}
+ .hq-unified.menu-open>.hq-sidebar{left:0}
+ .hq-unified.is-collapsed>.hq-sidebar{flex:0 0 268px;width:268px;min-width:268px;max-width:268px}
+ .hq-unified>.hq-workspace{height:auto;min-height:100vh;overflow:visible}
+ .hq-sidebar.is-collapsed .hq-sidebrand img,.hq-sidebar.is-collapsed .hq-sidebrand>span,.hq-sidebar.is-collapsed .hq-sidebrand small,.hq-sidebar.is-collapsed .hq-navgroup button span,.hq-sidebar.is-collapsed .hq-navgroup>p,.hq-sidebar.is-collapsed .hq-sidefoot b,.hq-sidebar.is-collapsed .hq-sidefoot small,.hq-sidebar.is-collapsed .hq-sidefoot button span{display:block}
+ .hq-sidebar.is-collapsed .hq-navgroup button,.hq-sidebar.is-collapsed .hq-sidefoot button{justify-content:flex-start;padding:9px 11px}
+ .hq-sidebar.is-collapsed .hq-sidebar-toggle{position:absolute}
+}
