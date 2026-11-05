@@ -76,6 +76,24 @@
     },
     "archived": {
       "type": "boolean"
+    },
+    "task_id": {
+      "type": "string"
+    },
+    "parent_activity_id": {
+      "type": "string"
+    },
+    "next_due": {
+      "type": "string"
+    },
+    "contact": {
+      "type": "string"
+    },
+    "product": {
+      "type": "string"
+    },
+    "deal_ref": {
+      "type": "string"
     }
   },
   "rls": {
