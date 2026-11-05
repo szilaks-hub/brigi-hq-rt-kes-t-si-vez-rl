@@ -15,11 +15,11 @@ import HqPointTable from '@/components/HqPointTable';
 import HqCounties from '@/components/HqCounties';
 import CompanyCountyCell from '@/components/CompanyCountyCell';
 import CompanyCountyBulk from '@/components/CompanyCountyBulk';
-import HqRadialMenu from '@/components/HqRadialMenu';
+import HqSidebar from '@/components/HqSidebar';
 import CompanyInactivate from '@/components/CompanyInactivate';
 import InactiveCompanies from '@/components/InactiveCompanies';
 import HqTeamCompare from '@/components/HqTeamCompare';
-import {LayoutDashboard,ClipboardList,Target,TrendingUp,Users,Building2,GitCompare,Globe,Package,Activity,FileText,Table2,Database,FolderOpen,SlidersHorizontal,UserCog,Award,CalendarDays,MapPin} from 'lucide-react';
+import {LayoutDashboard,ClipboardList,Target,TrendingUp,Users,Building2,GitCompare,Globe,Package,Activity,FileText,Table2,Database,FolderOpen,SlidersHorizontal,UserCog,Award,CalendarDays,MapPin,Menu} from 'lucide-react';
 const NAV_GROUPS=[
  {title:'Napi munka',items:[['overview','Áttekintés',LayoutDashboard],['daily','Napi jelentés',ClipboardList],['plan','Naptár és teendők',CalendarDays],['results','Saját eredmény',Award],['attention','Értékesítési teendők',Target]]},
  {title:'Értékesítés és fejlődés',items:[['trends','Havi összehasonlítás',TrendingUp],['compare','Kolléga összehasonlítás',Users],['counties','Megyei térkép',MapPin],['summary','DATA / Summary',Table2],['review','Értékelő készítése',Target],['team','Csapat és kollégák',Users],['companies','Vevőmegtartás',Building2],['products','Termékek és beszerzés',Package],['countries','Országok',Globe]]},
@@ -41,6 +41,8 @@ function Field({label,children}){return <label className="hq-field"><span>{label
 export default function HQApp(){
  const auth=useAuth(),[boot,setBoot]=useState(null),[error,setError]=useState(''),[note,setNote]=useState(''),[busy,setBusy]=useState(''),[view,setView]=useState('overview'),[request,setRequest]=useState({view:'overview',id:0}),[docScope,setDocScope]=useState({}),[reportRefresh,setReportRefresh]=useState(0),[prefill,setPrefill]=useState(null),[countyFocus,setCountyFocus]=useState('');
  const nav=useRef({view:'overview',snapshot:null}),stack=useRef([]),expected=useRef('overview'),reportHandle=useRef(null),[backCount,setBackCount]=useState(0);
+ const [collapsed,setCollapsed]=useState(()=>{try{return localStorage.getItem('hq-sidebar-collapsed')==='1'}catch{return false}}),[mobileOpen,setMobileOpen]=useState(false);
+ const toggleCollapsed=()=>setCollapsed(v=>{try{localStorage.setItem('hq-sidebar-collapsed',v?'0':'1')}catch{}return !v});
  const refresh=async()=>{const d=await call('bootstrap');setBoot(d);return d};
  const navAllowed=k=>boot.admin||(boot.manager?!['access','data','vectory'].includes(k):EMPLOYEE_NAV.includes(k));
  const routeAllowed=k=>navAllowed(k)||(!boot.manager&&k==='documents');
@@ -50,7 +52,7 @@ export default function HQApp(){
  const remember=()=>{stack.current.push(structuredClone(nav.current));if(stack.current.length>60)stack.current.shift();setBackCount(stack.current.length)};
  const allowedLeave=()=>!document.querySelector('.hq-native:not([hidden]) .hq-editor')||confirm('A megnyitott sor még nincs mentve. Elhagyod a munkalapot?');
  const applyRoute=(v,snapshot)=>{nav.current={view:v,snapshot:snapshot||nav.current.snapshot};setView(v);setError('');setNote('');if(REPORT_IDS.has(v)){expected.current=v;setRequest({view:v,snapshot,id:Date.now()})}};
- const go=v=>{if(v===nav.current.view||!routeAllowed(v))return;if(!allowedLeave())return;remember();applyRoute(v)};
+ const go=v=>{setMobileOpen(false);if(v===nav.current.view||!routeAllowed(v))return;if(!allowedLeave())return;remember();applyRoute(v)};
  const back=()=>{if(!allowedLeave())return;if(stack.current.length){const prev=stack.current.pop();setBackCount(stack.current.length);applyRoute(prev.view,prev.snapshot)}else go('overview')};
  const onNavigate=s=>{if(!REPORT_IDS.has(nav.current.view)||!routeAllowed(s.view))return;if(expected.current){if(s.view!==expected.current)return;expected.current=null;nav.current={view:s.view,snapshot:s};return}const old=nav.current.snapshot;if(old&&(old.view!==s.view||JSON.stringify(old.f)!==JSON.stringify(s.f))){remember()}nav.current={view:s.view,snapshot:s};setView(s.view)};
  const openDocuments=scope=>{setDocScope(scope||{});go('documents')};
@@ -61,12 +63,10 @@ export default function HQApp(){
  if(!boot)return <div className="hq-login"><div className="hq-card"><h1>BRIGI HQ</h1><p>{error||'Hozzáférés és adatok betöltése…'}</p><Btn onClick={()=>refresh().catch(e=>setError(e.message))}>Újrapróbálás</Btn><Btn onClick={()=>auth.logout()}>Kijelentkezés</Btn></div></div>;
  const context={boot,refresh,run,setNote,setError,openDocuments,onDailyChange,prefill,startTaskFor,askStats:c=>reportHandle.current?.ask?reportHandle.current.ask(c):Promise.resolve(null)},isReport=REPORT_IDS.has(view),current=ALL_NAV.find(x=>x[0]===view);
  const groups=NAV_GROUPS.map(g=>({...g,items:g.items.filter(([k])=>navAllowed(k))})).filter(g=>g.items.length);
- const segments=[{key:'overview',label:'Áttekintés'},{key:'directory',label:'Ügyfelek'},{key:'daily',label:'Napi jelentés'},{key:'plan',label:'Teendők'},{key:'offers',label:'Ajánlatok'},{key:boot.manager?'trends':'results',label:'Kimutatások'}].filter(s=>routeAllowed(s.key==='offers'?'documents':s.key));
- const tools=[{key:'documents',label:'Dokumentumtár',hint:'Iratok, ajánlatok és bizonylatok egy helyen'},...(boot.admin?[{key:'vectory',label:'VECTORY dok up',hint:'Forgalmi export ellenőrzött feltöltése',prominent:true}]:[])];
- const menuGo=k=>k==='offers'?openDocuments({category:'Ajánlat'}):go(k);
- const menuTool=k=>k==='vectory'?go('vectory'):openDocuments({});
- return <div className="hq-app hq-unified"><HqRadialMenu segments={segments} tools={tools} groups={groups} view={view} onGo={menuGo} onTool={menuTool}/>
- <div className="hq-workspace"><header className="hq-top hq-unified-top"><img src="/brigi-logo.png" alt="BRIGI HQ" className="hq-top-logo"/><div className="hq-breadcrumb"><span>BRIGI HQ</span><b>{current?.[1]||'Értékesítési Vezérlő'}</b></div><span className="hq-top-spacer"/><div className="hq-user"><b>{boot.employee}</b><small>{new Date().toLocaleDateString('hu-HU',{timeZone:'Europe/Budapest'})}</small></div><Btn disabled={!backCount&&view==='overview'} onClick={back}>← Vissza</Btn><Btn onClick={()=>auth.logout()}>Kilépés</Btn></header>
+ return <div className={'hq-app hq-unified'+(collapsed?' is-collapsed':'')+(mobileOpen?' menu-open':'')}>
+ <HqSidebar groups={groups} view={view} onGo={go} boot={boot} onLogout={()=>auth.logout()} collapsed={collapsed} onToggleCollapse={toggleCollapsed}/>
+ {mobileOpen&&<button className="hq-menu-shade" aria-label="Menü bezárása" onClick={()=>setMobileOpen(false)}/>}
+ <div className="hq-workspace"><header className="hq-top hq-unified-top"><button className="hq-mobile-menu" aria-label="Menü megnyitása" onClick={()=>setMobileOpen(true)}><Menu size={17}/></button><img src="/brigi-logo.png" alt="BRIGI HQ" className="hq-top-logo"/><div className="hq-breadcrumb"><span>BRIGI HQ</span><b>{current?.[1]||'Értékesítési Vezérlő'}</b></div><span className="hq-top-spacer"/><div className="hq-user"><b>{boot.employee}</b><small>{new Date().toLocaleDateString('hu-HU',{timeZone:'Europe/Budapest'})}</small></div><Btn disabled={!backCount&&view==='overview'} onClick={back}>← Vissza</Btn><Btn onClick={()=>auth.logout()}>Kilépés</Btn></header>
  {(busy||error||note)&&<div className={'hq-message '+(error?'error':'')} role="status">{error||busy||note}<button aria-label="Üzenet bezárása" onClick={()=>{setError('');setNote('')}}>×</button></div>}
  <section hidden={!isReport} className="hq-report-main"><Reports {...context} request={request} active={isReport} onNavigate={onNavigate} refreshKey={reportRefresh} handleRef={reportHandle}/></section>
  <div hidden={view!=='daily'} className="hq-native"><main className="hq-main"><Daily {...context}/></main></div>
