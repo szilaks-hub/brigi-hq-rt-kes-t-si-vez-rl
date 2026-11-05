@@ -1,7 +1,7 @@
 import React,{useEffect,useMemo,useState} from 'react';
 import {base44} from '@/api/base44Client';
 import {Button} from '@/components/ui/button';
-import {Lock,Unlock,Save,Sparkles,ShieldCheck,Calculator} from 'lucide-react';
+import {Lock,Unlock,Save,Sparkles,Calculator} from 'lucide-react';
 
 const api=async(action,data={})=>{try{const r=await base44.functions.invoke('hq-api',{action,...data});if(r.data?.error)throw Error(r.data.error);return r.data}catch(e){throw Error(e.response?.data?.error||e.message||'A művelet nem sikerült.')}};
 const fmt=(n,d=1)=>n==null||!Number.isFinite(Number(n))?'–':Number(n).toLocaleString('hu-HU',{maximumFractionDigits:d});
