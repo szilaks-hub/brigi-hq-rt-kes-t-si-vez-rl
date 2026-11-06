@@ -11,7 +11,7 @@ export default function HqSidebar({sections=[],view,onGo,onLogout,boot,open,onCl
   {open&&<div className="hq-side-scrim" onClick={onClose}/>}
   <aside className={'hq-side'+(open?' open':'')} aria-label="Főmenü">
    <div className="hq-side-brand">
-    <img src="https://media.base44.com/images/public/6ad9a93f34c02a6be8e504f1/42e6f23c2_image_8_.png" alt="BRIGI HQ" className="hq-side-logo"/>
+    <img src="https://media.base44.com/images/public/6ad9a93f34c02a6be8e504f1/cdd9c92cc_BRIGI_HQ_kk_B_monogramos_log.png" alt="BRIGI HQ" className="hq-side-logo"/>
     <div><b>BRIGI HQ</b><span>Értékesítési vezérlő</span></div>
     <button className="hq-side-close" onClick={onClose} aria-label="Menü bezárása"><X size={16}/></button>
    </div>
@@ -28,6 +28,7 @@ export default function HqSidebar({sections=[],view,onGo,onLogout,boot,open,onCl
      </div>})}
    </nav>
    <div className="hq-side-foot">
+    <div className="hq-side-company"><img src="https://media.base44.com/images/public/6ad9a93f34c02a6be8e504f1/38933096d_steel-transz-logo-04.png" alt="Steel-Transz" className="hq-side-company-logo"/><span>STEEL-TRANSZ</span></div>
     <b>{boot.employee}</b>
     <span>{boot.admin?'Adminisztrátor':boot.manager?'Vezető':'Értékesítő'}</span>
     <button className="hq-side-logout" onClick={onLogout}><LogOut size={13}/> Kilépés</button>
