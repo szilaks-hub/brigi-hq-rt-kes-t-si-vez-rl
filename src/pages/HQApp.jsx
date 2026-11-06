@@ -45,7 +45,7 @@ function Btn({children,primary=false,...props}){return <button className={'hq-bt
 function Stat({label,value,unit}){return <div className="hq-stat"><span>{label}</span><strong>{value}<small>{unit}</small></strong></div>}
 function Field({label,children}){return <label className="hq-field"><span>{label}</span>{children}</label>}
 export default function HQApp(){
- const auth=useAuth(),[boot,setBoot]=useState(null),[error,setError]=useState(''),[note,setNote]=useState(''),[busy,setBusy]=useState(''),[view,setView]=useState('home'),[request,setRequest]=useState({view:'home',id:0}),[docScope,setDocScope]=useState({}),[reportRefresh,setReportRefresh]=useState(0),[prefill,setPrefill]=useState(null),[countyFocus,setCountyFocus]=useState(''),[sideOpen,setSideOpen]=useState(false),[filterFields,setFilterFields]=useState([]);
+ const auth=useAuth(),[boot,setBoot]=useState(null),[error,setError]=useState(''),[note,setNote]=useState(''),[busy,setBusy]=useState(''),[view,setView]=useState('home'),[request,setRequest]=useState({view:'home',id:0}),[docScope,setDocScope]=useState({}),[reportRefresh,setReportRefresh]=useState(0),[prefill,setPrefill]=useState(null),[countyFocus,setCountyFocus]=useState(''),[sideOpen,setSideOpen]=useState(false),[filterFields,setFilterFields]=useState([]),[reportToolbarReady,setReportToolbarReady]=useState(false);
  const nav=useRef({view:'home',snapshot:null}),stack=useRef([]),expected=useRef('home'),reportHandle=useRef(null),[backCount,setBackCount]=useState(0);
  const refresh=async()=>{const d=await call('bootstrap');setBoot(d);return d};
  const navAllowed=k=>boot.admin||(boot.manager?!['access','data','vectory'].includes(k):EMPLOYEE_NAV.includes(k));
@@ -74,8 +74,14 @@ export default function HQApp(){
  <HqMasterSearch boot={boot} onStartTask={startTaskFor} onOpenDocuments={openDocuments} onGo={go}/>
  {(busy||error||note)&&<div className={'hq-message '+(error?'error':'')} role="status">{error||busy||note}<button aria-label="Üzenet bezárása" onClick={()=>{setError('');setNote('')}}>×</button></div>}
  {isReport&&<HqFilterBar fields={filterFields} onChange={(id,value)=>reportHandle.current?.filter(id,value)} onAction={id=>reportHandle.current?.action(id)}/>}
- {view==='home'&&<HqWorkSummary onGo={go} onStart={startTaskFor}/>}
- <section hidden={!isReport} className="hq-report-main"><Reports {...context} request={request} active={isReport} onFilters={setFilterFields} onNavigate={onNavigate} refreshKey={reportRefresh} handleRef={reportHandle}/></section>
+ {isReport&&<div className="hq-report-actions" role="toolbar" aria-label="Kimutatás műveletei">
+  <Btn disabled={!reportToolbarReady} onClick={()=>reportHandle.current?.action('backupTop')}>Adatmentés</Btn>
+  <Btn disabled={!reportToolbarReady} onClick={()=>reportHandle.current?.action('printBtn')}>Nézet nyomtatása / PDF</Btn>
+  <Btn primary disabled={!reportToolbarReady} onClick={()=>reportHandle.current?.action('fullReportBtn')}>KPI-jelentés / PDF</Btn>
+  {boot.admin&&<Btn primary disabled={!reportToolbarReady} onClick={()=>reportHandle.current?.action('importTop')}>+ Adatfeltöltés</Btn>}
+ </div>}
+ {view==='home'&&<HqWorkSummary onGo={go} onStart={startTaskFor}/>} 
+ <section hidden={!isReport} className="hq-report-main"><Reports {...context} request={request} active={isReport} onFilters={setFilterFields} onReady={setReportToolbarReady} onNavigate={onNavigate} refreshKey={reportRefresh} handleRef={reportHandle}/></section>
  <div hidden={view!=='daily'} className="hq-native"><main className="hq-main"><Daily {...context}/></main></div>
  {!isReport&&view!=='daily'&&<main className="hq-main hq-native">{view==='home'?<><HqTeamReports boot={boot} onGo={go} setError={setError}/><HqCaseFlow boot={boot} compact onContinue={startTaskFor} setError={setError}/><HqDashboard boot={boot} onGo={go} onOpenDocuments={openDocuments}/></>:view==='vectory'?<HqVectoryImport boot={boot} setNote={setNote} setError={setError} onImported={async()=>{await refresh();onDailyChange();reportHandle.current?.refresh()}}/>:view==='directory'?<Companies {...context}/>:view==='documents'?<Documents {...context} scope={docScope}/>:view==='rules'?<HqPointTable boot={boot} setNote={setNote}/>:view==='access'?<Access {...context}/>:view==='cases'?<HqCaseFlow boot={boot} onContinue={startTaskFor} setError={setError}/>:view==='plan'?<HqPlanner onPickCompany={startTaskFor}/>:view==='counties'?<HqCounties focus={countyFocus} onPickCompany={startTaskFor} boot={boot} onRefresh={refresh}/>:view==='results'?<MyResults {...context}/>:view==='compare'?<HqTeamCompare boot={boot} setError={setError}/>:null}</main>}
  </div></div>
@@ -165,7 +171,7 @@ function Access({boot,refresh,run,setNote}){
 }
 async function gz64(obj){let a=new Uint8Array(await new Response(new Blob([JSON.stringify(obj)]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer()),s='';for(let i=0;i<a.length;i+=8192)s+=String.fromCharCode(...a.slice(i,i+8192));return btoa(s)}
 async function ungz64(s){return JSON.parse(await new Response(new Blob([Uint8Array.from(atob(s),c=>c.charCodeAt(0))]).stream().pipeThrough(new DecompressionStream('gzip'))).text())}
-function Reports({boot,setError,request,active,onNavigate,onFilters,refreshKey,handleRef}){
+function Reports({boot,setError,request,active,onNavigate,onFilters,onReady,refreshKey,handleRef}){
  const frame=useRef(null),report=useRef(null),loadingRef=useRef(false),savingRef=useRef(false),ready=useRef(false),latest=useRef({request,active,onNavigate}),[html,setHtml]=useState(''),[status,setStatus]=useState('Kimutatás betöltése…'),[failed,setFailed]=useState(false),lastRefresh=useRef(refreshKey),askSeq=useRef(0),askWait=useRef(new Map());
  latest.current={request,active,onNavigate};
  const post=data=>frame.current?.contentWindow?.postMessage(data,'*');
@@ -175,7 +181,7 @@ function Reports({boot,setError,request,active,onNavigate,onFilters,refreshKey,h
   try{if(typeof w.__HQ_INIT__==='function'){w.__HQ_INIT__(payload);return}}catch(err){}
   post({type:'hq-init',...payload});
  };
- const load=async()=>{if(loadingRef.current||savingRef.current)return;loadingRef.current=true;setFailed(false);try{setStatus('Közös adatok és napi munkalapok betöltése…');const [r,h]=await Promise.all([call('report'),html?Promise.resolve(html):fetch('/hq-legacy.html').then(r=>{if(!r.ok)throw Error('A kimutatás felülete nem töltődött be.');return r.text()})]);report.current={...r,state:await ungz64(r.payload)};if(!html)setHtml(h);else init();setStatus('');
+ const load=async()=>{if(loadingRef.current||savingRef.current)return;loadingRef.current=true;onReady?.(false);setFailed(false);try{setStatus('Közös adatok és napi munkalapok betöltése…');const [r,h]=await Promise.all([call('report'),html?Promise.resolve(html):fetch('/hq-legacy.html').then(r=>{if(!r.ok)throw Error('A kimutatás felülete nem töltődött be.');return r.text()})]);report.current={...r,state:await ungz64(r.payload)};if(!html)setHtml(h);else init();setStatus('');
    setTimeout(()=>{if(!ready.current)setStatus('A kimutatás motorja nem indult el. Nyomd meg az „Adatok frissítése” gombot, vagy töltsd újra az oldalt.')},15000);
   }catch(e){setFailed(true);setStatus(e.message);setError(e.message)}finally{loadingRef.current=false}};
  useEffect(()=>{route()},[request]);
@@ -185,13 +191,13 @@ function Reports({boot,setError,request,active,onNavigate,onFilters,refreshKey,h
   const handler=async e=>{if(!frame.current||e.source!==frame.current.contentWindow)return;const msg=e.data;
    if(msg?.type==='hq-ready'){ready.current=true;init()}
    if(msg?.type==='hq-stage'){setStatus(msg.text||'')}
-   if(msg?.type==='hq-error'){setStatus('A kimutatás nem épült fel: '+msg.message)}
+   if(msg?.type==='hq-error'){onReady?.(false);setFailed(true);setStatus('A kimutatás nem épült fel: '+msg.message)}
    if(msg?.type==='hq-navigation'){
     latest.current.onNavigate(msg.snapshot);
     const doc=frame.current?.contentDocument;
     if(doc){const fields=Array.from(doc.querySelectorAll('#filters select')).map(s=>({id:s.id,label:s.parentElement.firstChild?.textContent||s.id,value:s.value,options:Array.from(s.options).map(o=>({value:o.value,label:o.textContent}))}));onFilters?.(fields);}
    }
-   if(msg?.type==='hq-initialized'){setStatus('');route()}
+   if(msg?.type==='hq-initialized'){setStatus('');frame.current?.contentDocument?.body.classList.add('hq-external-toolbar');onReady?.(true);route()}
    if(msg?.type==='hq-company-info'){const wait=askWait.current.get(msg.id);if(wait){askWait.current.delete(msg.id);wait(msg.info)}}
    if(msg?.type==='hq-save'){
     const send=data=>post({type:'hq-saved',id:msg.id,...data});
@@ -200,7 +206,7 @@ function Reports({boot,setError,request,active,onNavigate,onFilters,refreshKey,h
     try{setStatus('Közös kimutatás mentése…');const s=structuredClone(msg.state);for(const p of s.parts)p.rows=p.rows.filter(r=>!r.__hqLiveId);const payload=await gz64(s),revision=crypto.randomUUID(),chunks=Math.ceil(payload.length/8000);for(let i=0;i<chunks;i+=20){setStatus(`Közös mentés: ${Math.min(i+20,chunks)} / ${chunks}`);await call('stageChunks',{revision,chunks:Array.from({length:Math.min(20,chunks-i)},(_,j)=>({chunk_index:i+j,payload:payload.slice((i+j)*8000,(i+j+1)*8000)}))})}const result=await call('commitReport',{revision,chunk_count:chunks,expected_revision:report.current.manifest?.revision||null});report.current={...report.current,manifest:result.manifest,state:msg.state};send({ok:true});setStatus('Közös adatok mentve · '+new Date().toLocaleTimeString('hu-HU'))}catch(err){send({error:err.message});setStatus(err.message)}finally{savingRef.current=false}
    }
   };
-  window.addEventListener('message',handler);const warn=e=>{if(savingRef.current){e.preventDefault();e.returnValue=''}};window.addEventListener('beforeunload',warn); handleRef.current={refresh:load,filter:(id,value)=>{const el=frame.current?.contentDocument?.getElementById(id);if(el){el.value=value;el.dispatchEvent(new frame.current.contentWindow.Event('change',{bubbles:true}))}},action:id=>frame.current?.contentDocument?.getElementById(id)?.click(),ask:company=>new Promise(resolve=>{if(!company||!ready.current){resolve(null);return}const id=++askSeq.current,timer=setTimeout(()=>{askWait.current.delete(id);resolve(null)},12000);askWait.current.set(id,info=>{clearTimeout(timer);resolve(info)});post({type:'hq-company-ask',id,company})})};
+  window.addEventListener('message',handler);const warn=e=>{if(savingRef.current){e.preventDefault();e.returnValue=''}};window.addEventListener('beforeunload',warn); handleRef.current={refresh:load,filter:(id,value)=>{const el=frame.current?.contentDocument?.getElementById(id);if(el){el.value=value;el.dispatchEvent(new frame.current.contentWindow.Event('change',{bubbles:true}))}},action:id=>{const el=frame.current?.contentDocument?.getElementById(id);if(el&&!el.disabled&&!el.hidden)el.click()},ask:company=>new Promise(resolve=>{if(!company||!ready.current){resolve(null);return}const id=++askSeq.current,timer=setTimeout(()=>{askWait.current.delete(id);resolve(null)},12000);askWait.current.set(id,info=>{clearTimeout(timer);resolve(info)});post({type:'hq-company-ask',id,company})})};
   return()=>{window.removeEventListener('message',handler);window.removeEventListener('beforeunload',warn)};
  },[]);
  return <><div className="hq-reportbar"><span><i className="hq-live-dot"/>{status||(boot.manager?'Teljes kimutatás · közös, mentett adatok':'Saját forgalmad és napi aktivitásod')}</span><Btn disabled={loadingRef.current||savingRef.current} onClick={load}>{failed?'Újrapróbálás':'Adatok frissítése'}</Btn></div>{html?<iframe title="BRIGI HQ teljes értékesítési kimutatás" ref={frame} srcDoc={html} onLoad={()=>{init();setStatus('')}} className="hq-reportframe" sandbox="allow-scripts allow-same-origin allow-downloads allow-modals" allow="clipboard-write"/>:<div className="hq-empty">{status}</div>}</>;
