@@ -42,6 +42,16 @@ const iframe=document.querySelector('iframe.hq-reportframe');assert(iframe);ifra
 iframe.contentDocument.body.innerHTML='<div id="filters"><label>Év<select id="fyear"><option value="2025">2025</option><option value="2026" selected>2026</option></select></label></div><button id="ytd">Év eddig</button><button id="resetFilters">Alaphelyzet</button>';
 function msg(data){window.dispatchEvent(new w.MessageEvent('message',{source:iframe.contentWindow,origin:location.origin,data}))}
 await settle(()=>msg({type:'hq-ready'}));assert(messages.some(m=>m.type==='hq-init'&&m.view==='overview'));
+assert([...document.querySelectorAll('.hq-report-actions button')].every(b=>b.disabled));
+const toolbarIds=['backupTop','printBtn','fullReportBtn','importTop'],clicked=[];
+for(const id of toolbarIds){const b=iframe.contentDocument.createElement('button');b.id=id;b.onclick=()=>clicked.push(id);iframe.contentDocument.body.append(b)}
+await settle(()=>msg({type:'hq-initialized'}));
+assert(iframe.contentDocument.body.classList.contains('hq-external-toolbar'));
+const toolbar=[...document.querySelectorAll('.hq-report-actions button')];assert.equal(toolbar.length,4);
+for(const b of toolbar){assert(!b.disabled);await settle(()=>b.click())}
+assert.deepEqual(clicked,toolbarIds);
+await settle(()=>msg({type:'hq-error',message:'Test load failure'}));assert(toolbar.every(b=>b.disabled));
+await settle(()=>msg({type:'hq-initialized'}));assert(toolbar.every(b=>!b.disabled));
 await settle(()=>msg({type:'hq-navigation',snapshot:{view:'overview',f:{end:'2026-10'}}}));
 assert.equal(document.querySelector('.hq-filterbar select').value,'2026');
 let filterEvents=0;iframe.contentDocument.getElementById('fyear').addEventListener('change',()=>filterEvents++);
@@ -61,5 +71,5 @@ const saved=calls.filter(c=>c.action==='saveRow');assert.equal(saved.length,1);a
 assert(!document.querySelector('.hq-editor'));assert(container.textContent.includes('A bejegyzés és a kapcsolódó ügy mentve'));
 await settle(()=>nav('Vezérlőpult').click());assert.equal(document.querySelector('iframe.hq-reportframe'),iframe);
 await settle(()=>root.unmount());await w.happyDOM.close();
-console.log('PASS: five sidebar sections, overview routing, fixed filter bridge, report route retention, master partner search, prefilled call and single case-saving action. Isolated UI fixtures only.');
+console.log('PASS: fixed report actions forward once and disable on load/error; five sidebar sections, overview routing, fixed filter bridge, report route retention, master partner search, prefilled call and single case-saving action. Isolated UI fixtures only.');
 })().catch(e=>{console.error(e);process.exitCode=1});
