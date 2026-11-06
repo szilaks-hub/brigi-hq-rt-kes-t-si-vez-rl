@@ -174,3 +174,37 @@
 .hq-app ::-webkit-scrollbar-track{background:#e6daf129}
 @media(prefers-reduced-transparency:reduce){.hq-side{background:#472e64}.hq-workspace,.hq-master,.hq-filterbar,.hq-unified .hq-card,.hq-unified .hq-stat,.hq-master-results{backdrop-filter:none;-webkit-backdrop-filter:none;background-color:#f5f0fa}}
 @media print{.hq-app.hq-unified,.hq-workspace,.hq-unified .hq-card,.hq-unified .hq-stat,.hq-unified .hq-hero{background:#fff!important;box-shadow:none!important;backdrop-filter:none;-webkit-backdrop-filter:none}}
+
+/* Integrated original logos and fixed report actions */
+.hq-side-brand{
+ flex-shrink:0;align-items:stretch;padding:17px 12px 25px;
+ background:linear-gradient(180deg,#f8e5f0f5 0%,#f2daebed 65%,#e2bfd54d 100%);
+ border:0;border-radius:24px 24px 0 0;
+}
+.hq-side .hq-side-logo{
+ display:block;width:100%;max-width:100%;height:auto;object-fit:contain;
+ padding:0;background:transparent;border:0;border-radius:0;box-shadow:none;filter:none;
+}
+.hq-side .hq-side-foot{
+ flex-shrink:0;background:linear-gradient(145deg,#f2e1f0ed,#e5d5f1eb);
+ border-top:1px solid #ffffff85;border-radius:0 0 24px 24px;
+ padding:12px 16px 16px;color:#493455;
+}
+.hq-side .hq-side-foot b{color:#3f2c50}
+.hq-side .hq-side-foot>span{color:#745b86}
+.hq-side-company{display:flex;align-items:center;gap:10px;margin:0 0 11px;padding-bottom:10px;border-bottom:1px solid #ab8ab832}
+.hq-side-company-logo{display:block;width:48px;height:46px;object-fit:contain;background:transparent;border:0}
+.hq-side .hq-side-company span{font-size:11px;font-weight:700;letter-spacing:1.1px;color:#365f85;margin:0}
+.hq-side .hq-side-logout{background:#fff6;border-color:#bba1cf70;color:#614676;box-shadow:inset 0 1px #ffffff80}
+.hq-side .hq-side-logout:hover{background:#ffffffb3}
+.hq-report-actions{
+ flex-shrink:0;display:flex;align-items:center;justify-content:flex-end;gap:8px;
+ padding:8px 20px;background:linear-gradient(120deg,#ffffff9e,#f0e5fa85);
+ border-bottom:1px solid #ffffffb8;box-shadow:inset 0 1px #ffffffa6;
+ backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+}
+.hq-report-actions .hq-btn{font-size:12px;padding:9px 14px}
+@media(max-width:980px){.hq-side-close{top:auto;bottom:5px;right:8px;background:#73518d;color:#fff;border:1px solid #ffffff50}}
+@media(max-width:650px){.hq-report-actions{justify-content:flex-start;overflow-x:auto;padding:7px 12px;gap:6px}.hq-report-actions .hq-btn{flex-shrink:0;font-size:11px;padding:8px 10px}}
+@media print{.hq-report-actions{display:none!important}}
+
